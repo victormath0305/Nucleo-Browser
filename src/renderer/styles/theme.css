@@ -1,0 +1,124 @@
+/**
+ * Núcleo Browser - Design Tokens & Theme Variables
+ */
+
+:root {
+  /* Color Palette: Obsidian, Cyan Core & Electric Indigo */
+  --bg-primary: #0a0d14;
+  --bg-secondary: #101522;
+  --bg-tertiary: #141a29;
+  --bg-hover: rgba(255, 255, 255, 0.07);
+  --bg-active: rgba(255, 255, 255, 0.12);
+  --bg-input: #0e1320;
+  --bg-input-focus: #12192b;
+
+  /* Accent Colors */
+  --accent-cyan: #00e5ff;
+  --accent-cyan-glow: rgba(0, 229, 255, 0.35);
+  --accent-cyan-subtle: rgba(0, 229, 255, 0.15);
+  --accent-purple: #9d4edd;
+  --accent-blue: #0070f3;
+  --accent-gradient: linear-gradient(135deg, #00e5ff 0%, #0070f3 50%, #9d4edd 100%);
+  --accent-border: linear-gradient(135deg, rgba(0, 229, 255, 0.4), rgba(157, 78, 221, 0.2));
+
+  /* Status Colors */
+  --status-secure: #00f5a0;
+  --status-warning: #ffb703;
+  --status-danger: #ff4757;
+
+  /* Text Colors */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-disabled: #475569;
+
+  /* Borders & Dividers */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-focus: rgba(0, 229, 255, 0.6);
+  --border-glass: 1px solid rgba(255, 255, 255, 0.07);
+
+  /* Dimensions */
+  --topbar-height: 38px;
+  --navbar-height: 40px;
+  --total-toolbar-height: 78px;
+
+  /* Tab Dimensions */
+  --tab-height: 30px;
+  --tab-min-width: 120px;
+  --tab-max-width: 220px;
+
+  /* Typography */
+  --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  --font-family-mono: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+
+  /* Transitions */
+  --trans-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --trans-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Dynamic Primary Accent */
+  --accent-primary: #00e5ff;
+  --accent-primary-glow: rgba(0, 229, 255, 0.35);
+  --accent-primary-subtle: rgba(0, 229, 255, 0.15);
+
+  /* Shadows & Glows */
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --shadow-glow: 0 0 16px var(--accent-primary-glow);
+  --shadow-menu: 0 12px 32px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.09);
+}
+
+/* Light Theme Variables */
+[data-theme="light"] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --bg-tertiary: #e2e8f0;
+  --bg-hover: rgba(0, 0, 0, 0.06);
+  --bg-active: rgba(0, 0, 0, 0.1);
+  --bg-input: #ffffff;
+  --bg-input-focus: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-disabled: #94a3b8;
+  --border-subtle: rgba(0, 0, 0, 0.1);
+  --border-glass: 1px solid rgba(0, 0, 0, 0.08);
+  --shadow-menu: 0 12px 32px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+/* Accent Color Variations */
+[data-accent="indigo"] {
+  --accent-primary: #6366f1;
+  --accent-primary-glow: rgba(99, 102, 241, 0.35);
+  --accent-primary-subtle: rgba(99, 102, 241, 0.15);
+  --accent-cyan: #6366f1;
+  --accent-cyan-glow: rgba(99, 102, 241, 0.35);
+  --accent-cyan-subtle: rgba(99, 102, 241, 0.15);
+}
+
+[data-accent="purple"] {
+  --accent-primary: #a855f7;
+  --accent-primary-glow: rgba(168, 85, 247, 0.35);
+  --accent-primary-subtle: rgba(168, 85, 247, 0.15);
+  --accent-cyan: #a855f7;
+  --accent-cyan-glow: rgba(168, 85, 247, 0.35);
+  --accent-cyan-subtle: rgba(168, 85, 247, 0.15);
+}
+
+[data-accent="green"] {
+  --accent-primary: #10b981;
+  --accent-primary-glow: rgba(16, 185, 129, 0.35);
+  --accent-primary-subtle: rgba(16, 185, 129, 0.15);
+  --accent-cyan: #10b981;
+  --accent-cyan-glow: rgba(16, 185, 129, 0.35);
+  --accent-cyan-subtle: rgba(16, 185, 129, 0.15);
+}
+
+[data-accent="amber"] {
+  --accent-primary: #f59e0b;
+  --accent-primary-glow: rgba(245, 158, 11, 0.35);
+  --accent-primary-subtle: rgba(245, 158, 11, 0.15);
+  --accent-cyan: #f59e0b;
+  --accent-cyan-glow: rgba(245, 158, 11, 0.35);
+  --accent-cyan-subtle: rgba(245, 158, 11, 0.15);
+}
+

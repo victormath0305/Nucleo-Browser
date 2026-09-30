@@ -1,0 +1,54 @@
+{
+  "name": "nucleo-browser",
+  "productName": "Núcleo Browser",
+  "version": "0.6.0",
+  "description": "Navegador desktop moderno, seguro e modular baseado em Chromium",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node scripts/test-runner.js",
+    "generate-icons": "electron scripts/generate-icons.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "build": "electron-builder"
+  },
+  "keywords": [
+    "browser",
+    "chromium",
+    "electron",
+    "nucleo",
+    "windows",
+    "modular"
+  ],
+  "author": "Núcleo Browser Team",
+  "license": "MIT",
+  "build": {
+    "appId": "com.nucleobrowser.app",
+    "productName": "Núcleo Browser",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "src/assets/icons/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Núcleo Browser",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.7.0"
+  }
+}

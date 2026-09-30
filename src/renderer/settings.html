@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: chrome-extension:; font-src 'self';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configurações — Núcleo</title>
+  <link rel="stylesheet" href="styles/theme.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary, #0a0d14);
+      color: var(--text-primary, #f8fafc);
+      font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+      line-height: 1.5;
+    }
+
+    /* Layout Structure: Sidebar + Main Content */
+    .settings-layout {
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Sidebar Navigation */
+    .sidebar {
+      width: 260px;
+      min-width: 240px;
+      background: var(--bg-secondary, #101522);
+      border-right: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      user-select: none;
+    }
+
+    .sidebar-header {
+      padding: 24px 20px 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sidebar-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      color: var(--text-primary, #f8fafc);
+    }
+
+    .sidebar-nav {
+      list-style: none;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--text-secondary, #94a3b8);
+      cursor: pointer;
+      transition: background var(--trans-fast, 150ms ease), color var(--trans-fast, 150ms ease);
+    }
+
+    .nav-item svg {
+      width: 16px;
+      height: 16px;
+      stroke-width: 1.6;
+      stroke: currentColor;
+      fill: none;
+      flex-shrink: 0;
+    }
+
+    .nav-item:hover {
+      background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+      color: var(--text-primary, #f8fafc);
+    }
+
+    .nav-item.active {
+      background: rgba(0, 229, 255, 0.12);
+      color: var(--accent-primary, #00e5ff);
+      font-weight: 600;
+    }
+
+    .nav-item.active svg {
+      stroke: var(--accent-primary, #00e5ff);
+    }
+
+    /* Content Area */
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 40px 48px;
+      scroll-behavior: smooth;
+    }
+
+    .content-container {
+      max-width: 760px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+      padding-bottom: 80px;
+    }
+
+    /* Section Styles */
+    .settings-section {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.4px;
+      color: var(--text-primary, #f8fafc);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+    }
+
+    .card {
+      background: var(--bg-secondary, #101522);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .card-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+      gap: 20px;
+    }
+
+    .card-row:last-child {
+      border-bottom: none;
+    }
+
+    .row-info {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .row-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary, #f8fafc);
+    }
+
+    .row-desc {
+      font-size: 12.5px;
+      color: var(--text-secondary, #94a3b8);
+      line-height: 1.4;
+    }
+
+    .row-action {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all var(--trans-fast, 150ms ease);
+      border: none;
+      outline: none;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--accent-primary, #00e5ff);
+      color: #0a0d14;
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 0 14px var(--accent-primary-glow, rgba(0, 229, 255, 0.4));
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: var(--bg-tertiary, #141a29);
+      color: var(--text-primary, #f8fafc);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-danger {
+      background: rgba(255, 71, 87, 0.15);
+      color: #ff4757;
+      border: 1px solid rgba(255, 71, 87, 0.3);
+    }
+
+    .btn-danger:hover {
+      background: rgba(255, 71, 87, 0.25);
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
+    /* Select Dropdowns */
+    .select-input {
+      background: var(--bg-tertiary, #141a29);
+      color: var(--text-primary, #f8fafc);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      outline: none;
+      cursor: pointer;
+      min-width: 160px;
+    }
+
+    .select-input:focus {
+      border-color: var(--accent-primary, #00e5ff);
+    }
+
+    /* Text Inputs */
+    .text-input {
+      background: var(--bg-tertiary, #141a29);
+      color: var(--text-primary, #f8fafc);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      outline: none;
+      width: 100%;
+      font-family: inherit;
+    }
+
+    .text-input:focus {
+      border-color: var(--accent-primary, #00e5ff);
+    }
+
+    /* Toggle Switch */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: var(--bg-tertiary, #1c2438);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.15));
+      border-radius: 24px;
+      transition: var(--trans-fast, 150ms ease);
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: #94a3b8;
+      border-radius: 50%;
+      transition: var(--trans-fast, 150ms ease);
+    }
+
+    .toggle-switch input:checked + .toggle-slider {
+      background-color: var(--accent-primary, #00e5ff);
+      border-color: var(--accent-primary, #00e5ff);
+    }
+
+    .toggle-switch input:checked + .toggle-slider:before {
+      transform: translateX(20px);
+      background-color: #0a0d14;
+    }
+
+    /* Status Badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-badge.success {
+      background: rgba(0, 245, 160, 0.12);
+      color: #00f5a0;
+      border: 1px solid rgba(0, 245, 160, 0.25);
+    }
+
+    .status-badge.warning {
+      background: rgba(255, 183, 3, 0.12);
+      color: #ffb703;
+      border: 1px solid rgba(255, 183, 3, 0.25);
+    }
+
+    /* Radio Group */
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .radio-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .radio-option input[type="radio"] {
+      margin-top: 3px;
+      accent-color: var(--accent-primary, #00e5ff);
+      cursor: pointer;
+    }
+
+    /* Theme Option Cards */
+    .theme-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      width: 100%;
+    }
+
+    .theme-card {
+      background: var(--bg-tertiary, #141a29);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: all var(--trans-fast, 150ms ease);
+    }
+
+    .theme-card:hover {
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .theme-card.active {
+      border-color: var(--accent-primary, #00e5ff);
+      box-shadow: 0 0 12px var(--accent-primary-glow, rgba(0, 229, 255, 0.25));
+    }
+
+    .theme-card svg {
+      width: 24px;
+      height: 24px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.6;
+    }
+
+    /* Accent Color Selector */
+    .accent-palette {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .accent-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform var(--trans-fast, 150ms ease);
+    }
+
+    .accent-btn:hover {
+      transform: scale(1.15);
+    }
+
+    .accent-btn.active {
+      border-color: #f8fafc;
+      box-shadow: 0 0 10px currentColor;
+    }
+
+    /* Search Engines Table */
+    .engines-list {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+    }
+
+    .engine-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+    }
+
+    .engine-item:last-child {
+      border-bottom: none;
+    }
+
+    .engine-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .engine-name {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-primary, #f8fafc);
+    }
+
+    .engine-url {
+      font-size: 12px;
+      color: var(--text-muted, #64748b);
+      font-family: var(--font-family-mono, monospace);
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-secondary, #101522);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+      border-radius: 14px;
+      width: 90%;
+      max-width: 480px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .modal-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .settings-layout {
+        flex-direction: column;
+      }
+      .sidebar {
+        width: 100%;
+        min-width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+      }
+      .sidebar-nav {
+        flex-direction: row;
+        overflow-x: auto;
+      }
+      .content-area {
+        padding: 20px 16px;
+      }
+      .theme-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="settings-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <svg viewBox="0 0 16 16" width="20" height="20" stroke="var(--accent-primary, #00e5ff)" fill="none" stroke-width="1.6">
+          <circle cx="8" cy="8" r="2.5"/>
+          <path d="M 8 1.5 L 8 3 M 8 13 L 8 14.5 M 1.5 8 L 3 8 M 13 8 L 14.5 8" stroke-linecap="round"/>
+        </svg>
+        <span class="sidebar-title">Configurações</span>
+      </div>
+      <ul class="sidebar-nav">
+        <li class="nav-item active" data-section="section-general">
+          <svg viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>
+          Geral
+        </li>
+        <li class="nav-item" data-section="section-search">
+          <svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg>
+          Busca
+        </li>
+        <li class="nav-item" data-section="section-appearance">
+          <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><path d="M 8 2 A 6 6 0 0 0 8 14 Z" fill="currentColor"/></svg>
+          Aparência
+        </li>
+        <li class="nav-item" data-section="section-newtab">
+          <svg viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/><line x1="8" y1="5" x2="8" y2="11"/><line x1="5" y1="8" x2="11" y2="8"/></svg>
+          Nova Aba
+        </li>
+        <li class="nav-item" data-section="section-startup">
+          <svg viewBox="0 0 16 16"><polygon points="5,3 13,8 5,13"/></svg>
+          Ao Iniciar
+        </li>
+        <li class="nav-item" data-section="section-tabs">
+          <svg viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="1.5"/><line x1="1.5" y1="6.5" x2="14.5" y2="6.5"/></svg>
+          Abas
+        </li>
+        <li class="nav-item" data-section="section-downloads">
+          <svg viewBox="0 0 16 16"><path d="M 8 2 L 8 10 M 4.5 7 L 8 10.5 L 11.5 7 M 2 13 L 14 13"/></svg>
+          Downloads
+        </li>
+        <li class="nav-item" data-section="section-privacy">
+          <svg viewBox="0 0 16 16"><path d="M 8 1.5 L 13.5 3.5 V 7.5 C 13.5 11 10.8 13.8 8 14.5 C 5.2 13.8 2.5 11 2.5 7.5 V 3.5 Z"/></svg>
+          Privacidade
+        </li>
+        <li class="nav-item" data-section="section-shield">
+          <svg viewBox="0 0 16 16"><path d="M 8 1.5 L 13.5 3.5 V 7.5 C 13.5 11 10.8 13.8 8 14.5 C 5.2 13.8 2.5 11 2.5 7.5 V 3.5 Z"/><path d="M 6 8 L 7.5 9.5 L 10.5 6.5"/></svg>
+          Núcleo Shield
+        </li>
+        <li class="nav-item" data-section="section-extensions">
+          <svg viewBox="0 0 16 16"><path d="M 13.5 7.5 H 12.5 V 4.5 C 12.5 3.8 11.8 3.2 11.2 3.2 H 8.5 V 2 C 8.5 1.2 7.8 0.5 7 0.5 C 6.2 0.5 5.5 1.2 5.5 2 V 3.2 H 2.8 C 2.2 3.2 1.5 3.8 1.5 4.5 V 7.2 H 2.5 C 3.2 7.2 3.8 7.8 3.8 8.5 C 3.8 9.2 3.2 9.8 2.5 9.8 H 1.5 V 12.5 C 1.5 13.2 2.2 13.8 2.8 13.8 H 5.5 V 12.8 C 5.5 12 6.2 11.5 7 11.5 C 7.8 11.5 8.5 12 8.5 12.8 V 13.8 H 11.2 C 11.8 13.8 12.5 13.2 12.5 12.5 V 9.5 H 13.5 C 14.2 9.5 14.8 8.8 14.8 8 C 14.8 7.2 14.2 7.5 13.5 7.5 Z"/></svg>
+          Extensões
+        </li>
+        <li class="nav-item" data-section="section-bookmarks">
+          <svg viewBox="0 0 16 16"><path d="M 8 1.5 L 10 5.8 L 14.6 6.3 L 11.2 9.4 L 12.1 14 L 8 11.6 L 3.9 14 L 4.8 9.4 L 1.4 6.3 L 6 5.8 Z"/></svg>
+          Favoritos
+        </li>
+        <li class="nav-item" data-section="section-history">
+          <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><polyline points="8,4 8,8 10.5,10"/></svg>
+          Histórico
+        </li>
+        <li class="nav-item" data-section="section-reset">
+          <svg viewBox="0 0 16 16"><path d="M 2 8 A 6 6 0 1 1 4 12.5 M 2 8 L 2 12 M 2 8 L 6 8"/></svg>
+          Redefinir
+        </li>
+        <li class="nav-item" data-section="section-about">
+          <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6"/><line x1="8" y1="7" x2="8" y2="11.5"/><circle cx="8" cy="4.5" r="0.8" fill="currentColor"/></svg>
+          Sobre
+        </li>
+      </ul>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="content-area">
+      <div class="content-container">
+
+        <!-- Section: Geral -->
+        <section class="settings-section" id="section-general">
+          <h2 class="section-title">Geral</h2>
+          <div class="card">
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Navegador Padrão do Windows</span>
+                <span class="row-desc" id="defaultBrowserDesc">Verificando status de associação no Windows...</span>
+              </div>
+              <div class="row-action">
+                <span class="status-badge warning" id="defaultBrowserBadge">Verificando</span>
+                <button class="btn btn-primary btn-sm" id="btnMakeDefault">Tornar padrão</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Busca -->
+        <section class="settings-section" id="section-search">
+          <h2 class="section-title">Mecanismo de Pesquisa</h2>
+          <div class="card">
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Buscador padrão na barra de endereços</span>
+                <span class="row-desc">Utilizado quando um texto sem formato de URL for digitado na Omnibox</span>
+              </div>
+              <div class="row-action">
+                <select class="select-input" id="selectDefaultEngine">
+                  <!-- Populated dynamically -->
+                </select>
+              </div>
+            </div>
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Gerenciar mecanismos de pesquisa</span>
+                <span class="row-desc">Adicione, altere ou remova buscadores suportados</span>
+              </div>
+              <div class="row-action">
+                <button class="btn btn-secondary btn-sm" id="btnAddEngineModal">+ Adicionar buscador</button>
+              </div>
+            </div>
+            <div class="engines-list" id="enginesList">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Aparência -->
+        <section class="settings-section" id="section-appearance">
+          <h2 class="section-title">Aparência</h2>
+          <div class="card">
+            <div class="card-row" style="flex-direction: column; align-items: flex-start;">
+              <div class="row-info" style="margin-bottom: 8px;">
+                <span class="row-title">Tema</span>
+                <span class="row-desc">Selecione o esquema de cores preferido para a interface</span>
+              </div>
+              <div class="theme-grid">
+                <div class="theme-card" data-theme-val="system" id="themeCardSystem">
+                  <svg viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="9" rx="1"/><line x1="5" y1="14" x2="11" y2="14"/><line x1="8" y1="11" x2="8" y2="14"/></svg>
+                  <span style="font-size: 13px; font-weight: 600;">Padrão do Sistema</span>
+                </div>
+                <div class="theme-card" data-theme-val="dark" id="themeCardDark">
+                  <svg viewBox="0 0 16 16"><path d="M 13.5 9 A 6 6 0 1 1 7 2.5 A 5 5 0 0 0 13.5 9 Z"/></svg>
+                  <span style="font-size: 13px; font-weight: 600;">Escuro (Obsidian)</span>
+                </div>
+                <div class="theme-card" data-theme-val="light" id="themeCardLight">
+                  <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.5"/><path d="M 8 1 L 8 2.5 M 8 13.5 L 8 15 M 1 8 L 2.5 8 M 13.5 8 L 15 8 M 3 3 L 4 4 M 12 12 L 13 13 M 3 13 L 4 12 M 12 4 L 13 3"/></svg>
+                  <span style="font-size: 13px; font-weight: 600;">Claro</span>
+                </div>
+              </div>
+            </div>
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Cor de destaque</span>
+                <span class="row-desc">Personaliza botões de ação e realces ativos</span>
+              </div>
+              <div class="accent-palette">
+                <button class="accent-btn" data-accent="cyan" style="background: #00e5ff; color: #00e5ff;" title="Cyan Core"></button>
+                <button class="accent-btn" data-accent="indigo" style="background: #6366f1; color: #6366f1;" title="Electric Indigo"></button>
+                <button class="accent-btn" data-accent="purple" style="background: #a855f7; color: #a855f7;" title="Purple Glow"></button>
+                <button class="accent-btn" data-accent="green" style="background: #10b981; color: #10b981;" title="Emerald"></button>
+                <button class="accent-btn" data-accent="amber" style="background: #f59e0b; color: #f59e0b;" title="Amber"></button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Nova Aba -->
+        <section class="settings-section" id="section-newtab">
+          <h2 class="section-title">Página de Nova Aba</h2>
+          <div class="card">
+            <div class="card-row" style="flex-direction: column; align-items: flex-start; gap: 14px;">
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" name="newTabMode" value="nucleo" id="radioNewTabNucleo">
+                  <div>
+                    <div class="row-title">Página padrão do Núcleo Browser (Acesso rápido e favoritos)</div>
+                    <div class="row-desc">nucleo://newtab</div>
+                  </div>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="newTabMode" value="custom" id="radioNewTabCustom">
+                  <div>
+                    <div class="row-title">Abrir uma página personalizada</div>
+                    <div class="row-desc">Carregar URL específica ao abrir novas abas</div>
+                  </div>
+                </label>
+              </div>
+              <div id="customUrlContainer" style="width: 100%; display: none; margin-top: 6px;">
+                <input type="text" class="text-input" id="inputCustomNewTabUrl" placeholder="https://exemplo.com">
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Ao Iniciar -->
+        <section class="settings-section" id="section-startup">
+          <h2 class="section-title">Ao Iniciar</h2>
+          <div class="card">
+            <div class="card-row">
+              <div class="radio-group">
+                <label class="radio-option">
+                  <input type="radio" name="startupMode" value="newtab" id="radioStartupNewTab">
+                  <div>
+                    <div class="row-title">Abrir a página de Nova Aba</div>
+                    <div class="row-desc">Inicia uma sessão limpa com a página inicial</div>
+                  </div>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="startupMode" value="restore" id="radioStartupRestore">
+                  <div>
+                    <div class="row-title">Continuar de onde parei</div>
+                    <div class="row-desc">Reabre as abas abertas da última sessão (preparado)</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Abas -->
+        <section class="settings-section" id="section-tabs">
+          <h2 class="section-title">Comportamento de Abas</h2>
+          <div class="card">
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Abrir novas abas em segundo plano</span>
+                <span class="row-desc">Quando links forem abertos em nova aba, manter o foco na aba atual</span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="chkTabsInBackground">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Confirmar fechamento de múltiplas abas</span>
+                <span class="row-desc">Exibir confirmação ao fechar várias abas simultaneamente</span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="chkConfirmCloseMultiple">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Downloads -->
+        <section class="settings-section" id="section-downloads">
+          <h2 class="section-title">Downloads</h2>
+          <div class="card">
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Local padrão de download</span>
+                <span class="row-desc" id="lblDownloadPath" style="font-family: var(--font-family-mono, monospace);">Carregando...</span>
+              </div>
+              <div class="row-action">
+                <button class="btn btn-secondary btn-sm" id="btnSelectDownloadPath">Escolher pasta</button>
+              </div>
+            </div>
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Perguntar onde salvar cada arquivo</span>
+                <span class="row-desc">Abre a caixa de diálogo nativa antes de iniciar o download</span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="chkAskDownloadLocation">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Privacidade -->
+        <section class="settings-section" id="section-privacy">
+          <h2 class="section-title">Privacidade e Segurança</h2>
+          <div class="card">
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Enviar cabeçalho "Do Not Track"</span>
+                <span class="row-desc">Solicita aos sites visitados que não realizem rastreamento</span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="chkDoNotTrack">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Limpar dados ao sair</span>
+                <span class="row-desc">Limpa cache e dados temporários automaticamente ao encerrar o navegador</span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="chkClearOnExit">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Limpar dados de navegação agora</span>
+                <span class="row-desc">Exclua histórico, cache e cookies acumulados</span>
+              </div>
+              <div class="row-action">
+                <button class="btn btn-secondary btn-sm" id="btnOpenClearDataModal">Limpar dados...</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Núcleo Shield -->
+        <section class="settings-section" id="section-shield">
+          <h2 class="section-title">Núcleo Shield</h2>
+          <div class="card">
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Bloqueio nativo de anúncios e rastreadores</span>
+                <span class="row-desc">34 regras nativas offline com intercepção direta na camada de rede</span>
+              </div>
+              <div class="row-action">
+                <span class="status-badge success" id="badgeShieldStatus">Ativo</span>
+                <button class="btn btn-secondary btn-sm" id="btnOpenShield">Configurar Shield</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Extensões -->
+        <section class="settings-section" id="section-extensions">
+          <h2 class="section-title">Extensões Chromium</h2>
+          <div class="card">
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Gerenciamento de Extensões</span>
+                <span class="row-desc" id="lblExtensionsCount">Carregando extensões...</span>
+              </div>
+              <div class="row-action">
+                <button class="btn btn-secondary btn-sm" id="btnOpenExtensions">Gerenciar extensões</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Favoritos -->
+        <section class="settings-section" id="section-bookmarks">
+          <h2 class="section-title">Favoritos</h2>
+          <div class="card">
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Barra de favoritos</span>
+                <span class="row-desc">Exibir barra sob a Omnibox (Atalho: Ctrl + Shift + B)</span>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="chkBookmarksBar">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Gerenciador de favoritos</span>
+                <span class="row-desc">Organize em pastas, renomeie ou pesquise favoritos</span>
+              </div>
+              <div class="row-action">
+                <button class="btn btn-secondary btn-sm" id="btnOpenBookmarks">Abrir favoritos</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Histórico -->
+        <section class="settings-section" id="section-history">
+          <h2 class="section-title">Histórico de Navegação</h2>
+          <div class="card">
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Registro cronológico local</span>
+                <span class="row-desc">Páginas internas e modos privados são estritamente excluídos</span>
+              </div>
+              <div class="row-action">
+                <button class="btn btn-secondary btn-sm" id="btnOpenHistory">Abrir histórico</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Redefinir -->
+        <section class="settings-section" id="section-reset">
+          <h2 class="section-title">Redefinir Configurações</h2>
+          <div class="card">
+            <div class="card-row">
+              <div class="row-info">
+                <span class="row-title">Restaurar configurações para os padrões originais</span>
+                <span class="row-desc">Restaura mecanismos de busca, tema e preferências. Favoritos, histórico, extensões e arquivos baixados não serão apagados.</span>
+              </div>
+              <div class="row-action">
+                <button class="btn btn-danger btn-sm" id="btnOpenResetModal">Restaurar configurações</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section: Sobre -->
+        <section class="settings-section" id="section-about">
+          <h2 class="section-title">Sobre o Núcleo Browser</h2>
+          <div class="card">
+            <div class="card-row" style="padding: 24px 20px;">
+              <div style="display: flex; gap: 18px; align-items: center;">
+                <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(0,229,255,0.15); border: 1px solid var(--accent-primary, #00e5ff); display: flex; align-items: center; justify-content: center; color: var(--accent-primary, #00e5ff);">
+                  <svg viewBox="0 0 16 16" width="26" height="26" fill="currentColor">
+                    <circle cx="8" cy="8" r="6"/>
+                  </svg>
+                </div>
+                <div>
+                  <div style="font-size: 18px; font-weight: 700; color: var(--text-primary, #f8fafc);" id="aboutAppName">Núcleo Browser</div>
+                  <div style="font-size: 13px; color: var(--accent-primary, #00e5ff); font-weight: 600;" id="aboutAppVersion">Versão 0.6.0</div>
+                </div>
+              </div>
+            </div>
+            <div class="card-row">
+              <span class="row-desc">Engine Chromium</span>
+              <span class="status-badge" style="background: rgba(255,255,255,0.06);" id="aboutChromiumVersion">—</span>
+            </div>
+            <div class="card-row">
+              <span class="row-desc">Runtime Electron</span>
+              <span class="status-badge" style="background: rgba(255,255,255,0.06);" id="aboutElectronVersion">—</span>
+            </div>
+            <div class="card-row">
+              <span class="row-desc">Núcleo Shield</span>
+              <span class="status-badge success">Ativo (34 regras nativas)</span>
+            </div>
+            <div class="card-row">
+              <span class="row-desc">Extensões Chromium</span>
+              <span class="status-badge success">Ativo (MV2 e MV3)</span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal: Adicionar Mecanismo de Busca -->
+  <div class="modal-overlay" id="modalAddEngine">
+    <div class="modal">
+      <div class="modal-header">
+        <span>Adicionar mecanismo de pesquisa</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div>
+          <label style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; display: block;">Nome do mecanismo</label>
+          <input type="text" class="text-input" id="inputEngineName" placeholder="Ex: Ecosia">
+        </div>
+        <div>
+          <label style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; display: block;">URL com %s no lugar da consulta</label>
+          <input type="text" class="text-input" id="inputEngineUrl" placeholder="https://exemplo.com/search?q=%s">
+        </div>
+        <div>
+          <label style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; display: block;">Atalho / Palavra-chave (opcional)</label>
+          <input type="text" class="text-input" id="inputEngineKeyword" placeholder="e">
+        </div>
+        <div id="modalAddEngineError" style="color: #ff4757; font-size: 12px; display: none;"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="btnCancelAddEngine">Cancelar</button>
+        <button class="btn btn-primary btn-sm" id="btnConfirmAddEngine">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Limpar Dados de Navegação -->
+  <div class="modal-overlay" id="modalClearData">
+    <div class="modal">
+      <div class="modal-header">
+        <span>Limpar dados de navegação</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div>
+          <label style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block;">Período</label>
+          <select class="select-input" id="selectClearPeriod" style="width: 100%;">
+            <option value="last_hour">Última hora</option>
+            <option value="last_24h">Últimas 24 horas</option>
+            <option value="last_7d">Últimos 7 dias</option>
+            <option value="all" selected>Todo o período</option>
+          </select>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 4px;">
+          <label style="display: flex; align-items: center; gap: 10px; font-size: 13.5px; cursor: pointer;">
+            <input type="checkbox" id="chkClearHistory" checked style="accent-color: var(--accent-primary);">
+            Histórico de navegação
+          </label>
+          <label style="display: flex; align-items: center; gap: 10px; font-size: 13.5px; cursor: pointer;">
+            <input type="checkbox" id="chkClearCache" checked style="accent-color: var(--accent-primary);">
+            Imagens e arquivos em cache
+          </label>
+          <label style="display: flex; align-items: center; gap: 10px; font-size: 13.5px; cursor: pointer;">
+            <input type="checkbox" id="chkClearCookies" checked style="accent-color: var(--accent-primary);">
+            Cookies e dados de sites
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="btnCancelClearData">Cancelar</button>
+        <button class="btn btn-danger btn-sm" id="btnConfirmClearData">Limpar dados</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Confirmar Redefinição -->
+  <div class="modal-overlay" id="modalResetConfirm">
+    <div class="modal">
+      <div class="modal-header">
+        <span>Restaurar configurações padrão?</span>
+      </div>
+      <div>
+        <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
+          Isso restaurará os mecanismos de pesquisa, o tema visual, o comportamento de abas e outras preferências para os padrões originais.
+        </p>
+        <p style="font-size: 12.5px; color: #00f5a0; margin-top: 8px;">
+          ✓ Seus favoritos, histórico de navegação, extensões e arquivos baixados não serão apagados.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="btnCancelReset">Cancelar</button>
+        <button class="btn btn-danger btn-sm" id="btnConfirmReset">Restaurar preferências</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controller Script -->
+  <script>
+    (function() {
+      const api = window.nucleoAPI;
+      if (!api || !api.settings) {
+        console.error('[Settings] nucleoAPI.settings not available');
+        return;
+      }
+
+      // --- Elements ---
+      const navItems = document.querySelectorAll('.nav-item');
+      const contentArea = document.querySelector('.content-area');
+
+      // General / Default Browser
+      const defaultBrowserDesc = document.getElementById('defaultBrowserDesc');
+      const defaultBrowserBadge = document.getElementById('defaultBrowserBadge');
+      const btnMakeDefault = document.getElementById('btnMakeDefault');
+
+      // Search
+      const selectDefaultEngine = document.getElementById('selectDefaultEngine');
+      const enginesList = document.getElementById('enginesList');
+      const btnAddEngineModal = document.getElementById('btnAddEngineModal');
+      const modalAddEngine = document.getElementById('modalAddEngine');
+      const btnCancelAddEngine = document.getElementById('btnCancelAddEngine');
+      const btnConfirmAddEngine = document.getElementById('btnConfirmAddEngine');
+      const inputEngineName = document.getElementById('inputEngineName');
+      const inputEngineUrl = document.getElementById('inputEngineUrl');
+      const inputEngineKeyword = document.getElementById('inputEngineKeyword');
+      const modalAddEngineError = document.getElementById('modalAddEngineError');
+
+      // Appearance
+      const themeCards = document.querySelectorAll('.theme-card');
+      const accentBtns = document.querySelectorAll('.accent-btn');
+
+      // New Tab
+      const radioNewTabNucleo = document.getElementById('radioNewTabNucleo');
+      const radioNewTabCustom = document.getElementById('radioNewTabCustom');
+      const customUrlContainer = document.getElementById('customUrlContainer');
+      const inputCustomNewTabUrl = document.getElementById('inputCustomNewTabUrl');
+
+      // Startup
+      const radioStartupNewTab = document.getElementById('radioStartupNewTab');
+      const radioStartupRestore = document.getElementById('radioStartupRestore');
+
+      // Tabs
+      const chkTabsInBackground = document.getElementById('chkTabsInBackground');
+      const chkConfirmCloseMultiple = document.getElementById('chkConfirmCloseMultiple');
+
+      // Downloads
+      const lblDownloadPath = document.getElementById('lblDownloadPath');
+      const btnSelectDownloadPath = document.getElementById('btnSelectDownloadPath');
+      const chkAskDownloadLocation = document.getElementById('chkAskDownloadLocation');
+
+      // Privacy
+      const chkDoNotTrack = document.getElementById('chkDoNotTrack');
+      const chkClearOnExit = document.getElementById('chkClearOnExit');
+      const btnOpenClearDataModal = document.getElementById('btnOpenClearDataModal');
+      const modalClearData = document.getElementById('modalClearData');
+      const btnCancelClearData = document.getElementById('btnCancelClearData');
+      const btnConfirmClearData = document.getElementById('btnConfirmClearData');
+      const selectClearPeriod = document.getElementById('selectClearPeriod');
+      const chkClearHistory = document.getElementById('chkClearHistory');
+      const chkClearCache = document.getElementById('chkClearCache');
+      const chkClearCookies = document.getElementById('chkClearCookies');
+
+      // Subsystems
+      const btnOpenShield = document.getElementById('btnOpenShield');
+      const btnOpenExtensions = document.getElementById('btnOpenExtensions');
+      const lblExtensionsCount = document.getElementById('lblExtensionsCount');
+      const chkBookmarksBar = document.getElementById('chkBookmarksBar');
+      const btnOpenBookmarks = document.getElementById('btnOpenBookmarks');
+      const btnOpenHistory = document.getElementById('btnOpenHistory');
+
+      // Reset
+      const btnOpenResetModal = document.getElementById('btnOpenResetModal');
+      const modalResetConfirm = document.getElementById('modalResetConfirm');
+      const btnCancelReset = document.getElementById('btnCancelReset');
+      const btnConfirmReset = document.getElementById('btnConfirmReset');
+
+      // About
+      const aboutAppName = document.getElementById('aboutAppName');
+      const aboutAppVersion = document.getElementById('aboutAppVersion');
+      const aboutChromiumVersion = document.getElementById('aboutChromiumVersion');
+      const aboutElectronVersion = document.getElementById('aboutElectronVersion');
+
+      // --- Navigation Sidebar Handling ---
+      navItems.forEach(item => {
+        item.addEventListener('click', () => {
+          navItems.forEach(i => i.classList.remove('active'));
+          item.classList.add('active');
+          const targetId = item.getAttribute('data-section');
+          const targetSection = document.getElementById(targetId);
+          if (targetSection) {
+            targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
+      });
+
+      // --- Default Browser ---
+      async function updateDefaultBrowserStatus() {
+        if (!api.defaultBrowser) return;
+        try {
+          const res = await api.defaultBrowser.isDefault();
+          if (res.isDefault) {
+            defaultBrowserBadge.textContent = 'Padrão';
+            defaultBrowserBadge.className = 'status-badge success';
+            defaultBrowserDesc.textContent = '✓ O Núcleo Browser é o navegador padrão do Windows.';
+            btnMakeDefault.style.display = 'none';
+          } else {
+            defaultBrowserBadge.textContent = 'Não é padrão';
+            defaultBrowserBadge.className = 'status-badge warning';
+            defaultBrowserDesc.textContent = 'O Núcleo Browser não está configurado como navegador padrão.';
+            btnMakeDefault.style.display = 'inline-flex';
+          }
+        } catch (err) {
+          console.warn('[Settings] Error checking default browser:', err);
+        }
+      }
+
+      btnMakeDefault.addEventListener('click', async () => {
+        if (!api.defaultBrowser) return;
+        btnMakeDefault.disabled = true;
+        btnMakeDefault.textContent = 'Abrindo configurações...';
+        try {
+          const res = await api.defaultBrowser.requestDefault();
+          if (res.message) {
+            defaultBrowserDesc.textContent = res.message;
+          }
+          await updateDefaultBrowserStatus();
+        } finally {
+          btnMakeDefault.disabled = false;
+          btnMakeDefault.textContent = 'Tornar padrão';
+        }
+      });
+
+      // --- Search Engines ---
+      async function loadSearchEngines() {
+        if (!api.search) return;
+        const engines = await api.search.getEngines();
+        const activeDefaultId = await api.settings.get('search.engine');
+
+        // Populate dropdown
+        selectDefaultEngine.innerHTML = '';
+        engines.forEach(e => {
+          const opt = document.createElement('option');
+          opt.value = e.id;
+          opt.textContent = e.name;
+          if (e.id === activeDefaultId) opt.selected = true;
+          selectDefaultEngine.appendChild(opt);
+        });
+
+        // Populate list
+        enginesList.innerHTML = '';
+        engines.forEach(e => {
+          const row = document.createElement('div');
+          row.className = 'engine-item';
+
+          const left = document.createElement('div');
+          left.className = 'engine-info';
+          left.innerHTML = `
+            <div>
+              <div class="engine-name">${escapeHtml(e.name)} ${e.keyword ? `<span style="font-size:11px; color:var(--text-muted);">(:${escapeHtml(e.keyword)})</span>` : ''}</div>
+              <div class="engine-url">${escapeHtml(e.searchUrl)}</div>
+            </div>
+          `;
+
+          const right = document.createElement('div');
+          right.className = 'row-action';
+
+          if (e.id === activeDefaultId) {
+            const badge = document.createElement('span');
+            badge.className = 'status-badge success';
+            badge.textContent = 'Padrão';
+            right.appendChild(badge);
+          } else {
+            const btnMakeDef = document.createElement('button');
+            btnMakeDef.className = 'btn btn-secondary btn-sm';
+            btnMakeDef.textContent = 'Tornar padrão';
+            btnMakeDef.addEventListener('click', async () => {
+              await api.search.setDefault(e.id);
+              await loadSearchEngines();
+            });
+            right.appendChild(btnMakeDef);
+
+            if (!e.isBuiltin) {
+              const btnDel = document.createElement('button');
+              btnDel.className = 'btn btn-danger btn-sm';
+              btnDel.textContent = 'Excluir';
+              btnDel.addEventListener('click', async () => {
+                await api.search.removeEngine(e.id);
+                await loadSearchEngines();
+              });
+              right.appendChild(btnDel);
+            }
+          }
+
+          row.appendChild(left);
+          row.appendChild(right);
+          enginesList.appendChild(row);
+        });
+      }
+
+      selectDefaultEngine.addEventListener('change', async () => {
+        const selectedId = selectDefaultEngine.value;
+        await api.search.setDefault(selectedId);
+        await loadSearchEngines();
+      });
+
+      btnAddEngineModal.addEventListener('click', () => {
+        inputEngineName.value = '';
+        inputEngineUrl.value = '';
+        inputEngineKeyword.value = '';
+        modalAddEngineError.style.display = 'none';
+        modalAddEngine.classList.add('show');
+      });
+
+      btnCancelAddEngine.addEventListener('click', () => {
+        modalAddEngine.classList.remove('show');
+      });
+
+      btnConfirmAddEngine.addEventListener('click', async () => {
+        const name = inputEngineName.value.trim();
+        const searchUrl = inputEngineUrl.value.trim();
+        const keyword = inputEngineKeyword.value.trim();
+
+        if (!name || !searchUrl) {
+          modalAddEngineError.textContent = 'Nome e URL de pesquisa são obrigatórios.';
+          modalAddEngineError.style.display = 'block';
+          return;
+        }
+
+        const res = await api.search.addEngine({ name, searchUrl, keyword });
+        if (res.success) {
+          modalAddEngine.classList.remove('show');
+          await loadSearchEngines();
+        } else {
+          modalAddEngineError.textContent = res.error || 'Erro ao adicionar buscador.';
+          modalAddEngineError.style.display = 'block';
+        }
+      });
+
+      // --- Appearance: Theme and Accent ---
+      function applyThemeUI(theme, accent) {
+        document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+        if (accent) document.documentElement.setAttribute('data-accent', accent);
+
+        themeCards.forEach(c => {
+          c.classList.toggle('active', c.getAttribute('data-theme-val') === theme);
+        });
+
+        accentBtns.forEach(b => {
+          b.classList.toggle('active', b.getAttribute('data-accent') === accent);
+        });
+      }
+
+      themeCards.forEach(card => {
+        card.addEventListener('click', async () => {
+          const val = card.getAttribute('data-theme-val');
+          await api.settings.set('appearance.theme', val);
+          const accent = await api.settings.get('appearance.accentColor');
+          applyThemeUI(val, accent);
+        });
+      });
+
+      accentBtns.forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const val = btn.getAttribute('data-accent');
+          await api.settings.set('appearance.accentColor', val);
+          const theme = await api.settings.get('appearance.theme');
+          applyThemeUI(theme, val);
+        });
+      });
+
+      // --- New Tab Settings ---
+      radioNewTabNucleo.addEventListener('change', async () => {
+        if (radioNewTabNucleo.checked) {
+          customUrlContainer.style.display = 'none';
+          await api.settings.set('newTab.mode', 'nucleo');
+        }
+      });
+
+      radioNewTabCustom.addEventListener('change', async () => {
+        if (radioNewTabCustom.checked) {
+          customUrlContainer.style.display = 'block';
+          await api.settings.set('newTab.mode', 'custom');
+        }
+      });
+
+      inputCustomNewTabUrl.addEventListener('change', async () => {
+        const val = inputCustomNewTabUrl.value.trim();
+        if (val) {
+          await api.settings.set('newTab.customUrl', val);
+        }
+      });
+
+      // --- Startup Settings ---
+      radioStartupNewTab.addEventListener('change', async () => {
+        if (radioStartupNewTab.checked) {
+          await api.settings.set('startup.mode', 'newtab');
+        }
+      });
+
+      radioStartupRestore.addEventListener('change', async () => {
+        if (radioStartupRestore.checked) {
+          await api.settings.set('startup.mode', 'restore');
+        }
+      });
+
+      // --- Tabs Preferences ---
+      chkTabsInBackground.addEventListener('change', async () => {
+        await api.settings.set('tabs.openNewTabsInBackground', chkTabsInBackground.checked);
+      });
+
+      chkConfirmCloseMultiple.addEventListener('change', async () => {
+        await api.settings.set('tabs.confirmCloseMultipleTabs', chkConfirmCloseMultiple.checked);
+      });
+
+      // --- Downloads ---
+      btnSelectDownloadPath.addEventListener('click', async () => {
+        const res = await api.settings.selectDownloadPath();
+        if (res.success && res.path) {
+          lblDownloadPath.textContent = res.path;
+        }
+      });
+
+      chkAskDownloadLocation.addEventListener('change', async () => {
+        await api.settings.set('downloads.askLocation', chkAskDownloadLocation.checked);
+      });
+
+      // --- Privacy ---
+      chkDoNotTrack.addEventListener('change', async () => {
+        await api.settings.set('privacy.doNotTrack', chkDoNotTrack.checked);
+      });
+
+      chkClearOnExit.addEventListener('change', async () => {
+        await api.settings.set('privacy.clearOnExit', chkClearOnExit.checked);
+      });
+
+      btnOpenClearDataModal.addEventListener('click', () => {
+        modalClearData.classList.add('show');
+      });
+
+      btnCancelClearData.addEventListener('click', () => {
+        modalClearData.classList.remove('show');
+      });
+
+      btnConfirmClearData.addEventListener('click', async () => {
+        const period = selectClearPeriod.value;
+        const history = chkClearHistory.checked;
+        const cache = chkClearCache.checked;
+        const cookies = chkClearCookies.checked;
+
+        btnConfirmClearData.disabled = true;
+        btnConfirmClearData.textContent = 'Limpando...';
+
+        try {
+          await api.privacy.clearData({ period, history, cache, cookies });
+          modalClearData.classList.remove('show');
+        } finally {
+          btnConfirmClearData.disabled = false;
+          btnConfirmClearData.textContent = 'Limpar dados';
+        }
+      });
+
+      // --- External Subsystems Links ---
+      btnOpenShield.addEventListener('click', () => {
+        api.navigate('nucleo://shield');
+      });
+
+      btnOpenExtensions.addEventListener('click', () => {
+        api.navigate('nucleo://extensions');
+      });
+
+      if (chkBookmarksBar) {
+        chkBookmarksBar.addEventListener('change', async () => {
+          if (api.bookmarks?.toggleBar) {
+            await api.bookmarks.toggleBar();
+          }
+        });
+      }
+
+      btnOpenBookmarks.addEventListener('click', () => {
+        api.navigate('nucleo://bookmarks');
+      });
+
+      btnOpenHistory.addEventListener('click', () => {
+        api.navigate('nucleo://history');
+      });
+
+      // --- Reset Settings ---
+      btnOpenResetModal.addEventListener('click', () => {
+        modalResetConfirm.classList.add('show');
+      });
+
+      btnCancelReset.addEventListener('click', () => {
+        modalResetConfirm.classList.remove('show');
+      });
+
+      btnConfirmReset.addEventListener('click', async () => {
+        btnConfirmReset.disabled = true;
+        btnConfirmReset.textContent = 'Restaurando...';
+        try {
+          await api.settings.reset();
+          modalResetConfirm.classList.remove('show');
+          await loadAllSettings();
+        } finally {
+          btnConfirmReset.disabled = false;
+          btnConfirmReset.textContent = 'Restaurar preferências';
+        }
+      });
+
+      // --- Helper Functions ---
+      function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      // --- Master Load Settings ---
+      async function loadAllSettings() {
+        const settings = await api.settings.getAll();
+
+        // Default Browser
+        await updateDefaultBrowserStatus();
+
+        // Search Engines
+        await loadSearchEngines();
+
+        // Appearance
+        applyThemeUI(settings.appearance.theme, settings.appearance.accentColor);
+
+        // New Tab
+        if (settings.newTab.mode === 'custom') {
+          radioNewTabCustom.checked = true;
+          customUrlContainer.style.display = 'block';
+        } else {
+          radioNewTabNucleo.checked = true;
+          customUrlContainer.style.display = 'none';
+        }
+        inputCustomNewTabUrl.value = settings.newTab.customUrl || '';
+
+        // Startup
+        if (settings.startup.mode === 'restore') {
+          radioStartupRestore.checked = true;
+        } else {
+          radioStartupNewTab.checked = true;
+        }
+
+        // Tabs
+        chkTabsInBackground.checked = Boolean(settings.tabs.openNewTabsInBackground);
+        chkConfirmCloseMultiple.checked = Boolean(settings.tabs.confirmCloseMultipleTabs);
+
+        // Downloads
+        lblDownloadPath.textContent = settings.downloads.defaultPath || 'Não definido';
+        chkAskDownloadLocation.checked = Boolean(settings.downloads.askLocation);
+
+        // Privacy
+        chkDoNotTrack.checked = Boolean(settings.privacy.doNotTrack);
+        chkClearOnExit.checked = Boolean(settings.privacy.clearOnExit);
+
+        // Bookmarks Bar state
+        if (api.bookmarks?.isBarVisible) {
+          const barVis = await api.bookmarks.isBarVisible();
+          chkBookmarksBar.checked = barVis;
+        }
+
+        // Extensions count
+        if (api.extensions?.list) {
+          const exts = await api.extensions.list();
+          const active = exts.filter(e => e.enabled).length;
+          lblExtensionsCount.textContent = `${exts.length} extensões instaladas (${active} ativas)`;
+        }
+
+        // About info
+        if (api.system?.getAboutInfo) {
+          const info = await api.system.getAboutInfo();
+          aboutAppName.textContent = info.appName;
+          aboutAppVersion.textContent = `Versão ${info.appVersion}`;
+          aboutChromiumVersion.textContent = `v${info.chromeVersion}`;
+          aboutElectronVersion.textContent = `v${info.electronVersion}`;
+        }
+      }
+
+      // Initialize on DOMContentLoaded
+      document.addEventListener('DOMContentLoaded', async () => {
+        try {
+          await loadAllSettings();
+        } catch (err) {
+          console.error('[Settings] Error during initialization:', err);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Núcleo Shield — Proteção e Privacidade</title>
+  <link rel="stylesheet" href="styles/theme.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary, #0a0d14);
+      color: var(--text-primary, #e2e8f0);
+      font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif);
+      padding: 40px 24px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+    }
+
+    .header-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .shield-badge-large {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.2), rgba(121, 40, 202, 0.2));
+      border: 1px solid rgba(0, 229, 255, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-cyan, #00e5ff);
+      box-shadow: 0 0 20px rgba(0, 229, 255, 0.2);
+    }
+
+    .shield-badge-large svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    .header-text h1 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-text h1 span.tag {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(0, 229, 255, 0.15);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      color: var(--accent-cyan, #00e5ff);
+      font-weight: 600;
+    }
+
+    .header-text p {
+      font-size: 13px;
+      color: var(--text-secondary, #94a3b8);
+      margin-top: 4px;
+    }
+
+    .test-page-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+      border-radius: 8px;
+      color: var(--text-primary, #e2e8f0);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 150ms ease;
+      cursor: pointer;
+    }
+
+    .test-page-link:hover {
+      background: rgba(0, 229, 255, 0.1);
+      border-color: rgba(0, 229, 255, 0.3);
+      color: var(--accent-cyan, #00e5ff);
+    }
+
+    /* Master Switch Card */
+    .master-switch-card {
+      background: var(--bg-secondary, #121826);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .master-info h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .master-info p {
+      font-size: 13px;
+      color: var(--text-secondary, #94a3b8);
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 48px;
+      height: 26px;
+      display: inline-block;
+      cursor: pointer;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: #2e384d;
+      border-radius: 34px;
+      transition: 200ms ease;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      border-radius: 50%;
+      transition: 200ms ease;
+    }
+
+    input:checked + .toggle-slider {
+      background-color: var(--accent-cyan, #00e5ff);
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+    }
+
+    input:checked + .toggle-slider:before {
+      transform: translateX(22px);
+      background-color: #0a0d14;
+    }
+
+    /* Stats Grid */
+    .section-title {
+      font-size: 15px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary, #94a3b8);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: var(--bg-secondary, #121826);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .stat-card.highlight {
+      border-color: rgba(0, 229, 255, 0.3);
+      background: linear-gradient(180deg, rgba(0, 229, 255, 0.06) 0%, var(--bg-secondary, #121826) 100%);
+    }
+
+    .stat-label {
+      font-size: 11.5px;
+      color: var(--text-secondary, #94a3b8);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .stat-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: #ffffff;
+      font-feature-settings: "tnum";
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-card.highlight .stat-value {
+      color: var(--accent-cyan, #00e5ff);
+    }
+
+    /* Rules & Engine Card */
+    .card {
+      background: var(--bg-secondary, #121826);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+      border-radius: 12px;
+      padding: 20px 24px;
+    }
+
+    .card-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .card-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .card-row:first-child {
+      padding-top: 0;
+    }
+
+    .row-label {
+      font-size: 13.5px;
+      color: var(--text-primary, #e2e8f0);
+    }
+
+    .row-desc {
+      font-size: 12px;
+      color: var(--text-secondary, #94a3b8);
+      margin-top: 2px;
+    }
+
+    .row-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary, #e2e8f0);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 3px 8px;
+      border-radius: 5px;
+    }
+
+    /* Whitelist Form & List */
+    .whitelist-input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .text-input {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13.5px;
+      color: #ffffff;
+      outline: none;
+      transition: border-color 150ms ease;
+    }
+
+    .text-input:focus {
+      border-color: var(--accent-cyan, #00e5ff);
+      box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.15);
+    }
+
+    .btn {
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 150ms ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: var(--accent-cyan, #00e5ff);
+      color: #0a0d14;
+    }
+
+    .btn-primary:hover {
+      background: #33ebff;
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-primary, #e2e8f0);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.1);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 6px;
+    }
+
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: #ef4444;
+    }
+
+    .whitelist-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .whitelist-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .whitelist-empty {
+      text-align: center;
+      padding: 20px;
+      font-size: 13px;
+      color: var(--text-secondary, #94a3b8);
+      font-style: italic;
+    }
+
+    /* Actions Footer */
+    .actions-footer {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: flex-end;
+      padding-top: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-info">
+        <div class="shield-badge-large">
+          <svg viewBox="0 0 16 16">
+            <path d="M 8 1.5 L 13.5 3.5 V 7.5 C 13.5 11 10.8 13.8 8 14.5 C 5.2 13.8 2.5 11 2.5 7.5 V 3.5 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M 6 8 L 7.5 9.5 L 10.5 6.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="header-text">
+          <h1>Núcleo Shield <span class="tag">v0.4.0</span></h1>
+          <p>Proteção nativa contra anúncios, rastreadores e requisições intrusivas.</p>
+        </div>
+      </div>
+      <button class="test-page-link" id="btnOpenTestFixture" title="Abrir página de teste local do Shield">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M 2 2 L 14 2 L 14 14 L 2 14 Z"/>
+          <path d="M 5 6 L 11 6 M 5 10 L 9 10"/>
+        </svg>
+        Página de Testes
+      </button>
+    </header>
+
+    <!-- Master Switch Card -->
+    <section class="master-switch-card">
+      <div class="master-info">
+        <h3 id="shieldStatusTitle">Proteção do Núcleo Shield</h3>
+        <p id="shieldStatusDescription">Bloqueando anúncios e rastreadores antes mesmo do carregamento de rede.</p>
+      </div>
+      <label class="toggle-switch" title="Ativar ou desativar o Shield globalmente">
+        <input type="checkbox" id="masterShieldToggle" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </section>
+
+    <!-- Cumulative Statistics -->
+    <section>
+      <div class="section-title">
+        <span>Estatísticas Globais</span>
+        <button class="btn btn-secondary" id="btnResetStats" style="font-size: 11px; padding: 4px 10px;">Zerar Estatísticas</button>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card highlight">
+          <span class="stat-label">Total Bloqueado</span>
+          <span class="stat-value" id="statTotalBlocked">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Anúncios</span>
+          <span class="stat-value" id="statAdsBlocked">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Rastreadores</span>
+          <span class="stat-value" id="statTrackersBlocked">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Telemetria</span>
+          <span class="stat-value" id="statAnalyticsBlocked">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Outros</span>
+          <span class="stat-value" id="statOtherBlocked">0</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Analisadas</span>
+          <span class="stat-value" id="statTotalAnalyzed">0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Engine & Rules Details -->
+    <section>
+      <div class="section-title">Mecanismo de Filtros</div>
+      <div class="card">
+        <div class="card-row">
+          <div>
+            <div class="row-label">Lista de Regras Integrada</div>
+            <div class="row-desc">Conjunto nativo offline de regras para domínios e caminhos conhecidos.</div>
+          </div>
+          <span class="row-value" id="infoRulesCount">23 regras ativas</span>
+        </div>
+        <div class="card-row">
+          <div>
+            <div class="row-label">Versão da Lista</div>
+            <div class="row-desc">Atualização determinística local para proteção permanente.</div>
+          </div>
+          <span class="row-value" id="infoListVersion">2026.09.1</span>
+        </div>
+        <div class="card-row">
+          <div>
+            <div class="row-label">Motor de Decisão</div>
+            <div class="row-desc">Lookup O(1) de domínios exatos + regex compilado + cache LRU.</div>
+          </div>
+          <span class="row-value" style="color: #10b981;">Ativo & Operacional</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Site Whitelist / Exceptions -->
+    <section>
+      <div class="section-title">Lista de Exceções (Sites Permitidos)</div>
+      <div class="card">
+        <div class="whitelist-input-group">
+          <input type="text" id="whitelistInput" class="text-input" placeholder="Digite um domínio (ex: exemplo.com.br)..." spellcheck="false">
+          <button class="btn btn-primary" id="btnAddWhitelist">Permitir Site</button>
+        </div>
+        <div class="whitelist-list" id="whitelistContainer">
+          <div class="whitelist-empty">Nenhum site adicionado às exceções. A proteção está ativa para todos os sites.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer Actions -->
+    <footer class="actions-footer">
+      <button class="btn btn-secondary" id="btnRestoreDefaults">Restaurar Regras Padrão</button>
+    </footer>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const api = window.nucleoAPI?.shield;
+      if (!api) {
+        console.error('[Shield Page] Shield API not found in nucleoAPI bridge');
+        return;
+      }
+
+      const masterToggle = document.getElementById('masterShieldToggle');
+      const statusTitle = document.getElementById('shieldStatusTitle');
+      const statusDesc = document.getElementById('shieldStatusDescription');
+      const statTotalBlocked = document.getElementById('statTotalBlocked');
+      const statAdsBlocked = document.getElementById('statAdsBlocked');
+      const statTrackersBlocked = document.getElementById('statTrackersBlocked');
+      const statAnalyticsBlocked = document.getElementById('statAnalyticsBlocked');
+      const statOtherBlocked = document.getElementById('statOtherBlocked');
+      const statTotalAnalyzed = document.getElementById('statTotalAnalyzed');
+      const infoRulesCount = document.getElementById('infoRulesCount');
+      const infoListVersion = document.getElementById('infoListVersion');
+      const whitelistInput = document.getElementById('whitelistInput');
+      const btnAddWhitelist = document.getElementById('btnAddWhitelist');
+      const whitelistContainer = document.getElementById('whitelistContainer');
+      const btnResetStats = document.getElementById('btnResetStats');
+      const btnRestoreDefaults = document.getElementById('btnRestoreDefaults');
+      const btnOpenTestFixture = document.getElementById('btnOpenTestFixture');
+
+      function formatNumber(n) {
+        return (n || 0).toLocaleString('pt-BR');
+      }
+
+      function renderWhitelist(items) {
+        if (!items || items.length === 0) {
+          whitelistContainer.innerHTML = '<div class="whitelist-empty">Nenhum site adicionado às exceções. A proteção está ativa para todos os sites.</div>';
+          return;
+        }
+
+        whitelistContainer.innerHTML = '';
+        items.forEach((domain) => {
+          const itemEl = document.createElement('div');
+          itemEl.className = 'whitelist-item';
+          itemEl.innerHTML = `
+            <span><strong>${domain}</strong> (Proteção pausada neste domínio)</span>
+            <button class="btn btn-danger" data-domain="${domain}">Remover</button>
+          `;
+
+          itemEl.querySelector('button').addEventListener('click', async () => {
+            await api.removeWhitelist(domain);
+            await loadData();
+          });
+
+          whitelistContainer.appendChild(itemEl);
+        });
+      }
+
+      async function loadData() {
+        try {
+          const stats = await api.getGlobalStats();
+          if (!stats) return;
+
+          masterToggle.checked = Boolean(stats.enabled);
+          if (stats.enabled) {
+            statusTitle.textContent = 'Proteção do Núcleo Shield: Ativa';
+            statusDesc.textContent = 'Bloqueando anúncios e rastreadores antes mesmo do carregamento de rede.';
+          } else {
+            statusTitle.textContent = 'Proteção do Núcleo Shield: Pausada';
+            statusDesc.textContent = 'O Shield está desativado. Nenhuma requisição será bloqueada.';
+          }
+
+          const cum = stats.cumulative || {};
+          statTotalBlocked.textContent = formatNumber(cum.totalBlocked);
+          statAdsBlocked.textContent = formatNumber(cum.adsBlocked);
+          statTrackersBlocked.textContent = formatNumber(cum.trackersBlocked);
+          statAnalyticsBlocked.textContent = formatNumber(cum.analyticsBlocked);
+          statOtherBlocked.textContent = formatNumber(cum.otherBlocked);
+          statTotalAnalyzed.textContent = formatNumber(cum.totalAnalyzed);
+
+          infoRulesCount.textContent = `${stats.rulesCount || 0} regras ativas`;
+          if (stats.listMetadata?.version) {
+            infoListVersion.textContent = stats.listMetadata.version;
+          }
+
+          const whitelist = await api.getWhitelist();
+          renderWhitelist(whitelist);
+        } catch (err) {
+          console.error('[Shield Page] Failed to load Shield data:', err);
+        }
+      }
+
+      // Master Toggle
+      masterToggle.addEventListener('change', async () => {
+        await api.setEnabled(masterToggle.checked);
+        await loadData();
+      });
+
+      // Add Whitelist Domain
+      async function handleAddWhitelist() {
+        const domain = whitelistInput.value.trim().toLowerCase();
+        if (!domain) return;
+        await api.addWhitelist(domain);
+        whitelistInput.value = '';
+        await loadData();
+      }
+
+      btnAddWhitelist.addEventListener('click', handleAddWhitelist);
+      whitelistInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleAddWhitelist();
+      });
+
+      // Reset Stats
+      btnResetStats.addEventListener('click', async () => {
+        if (confirm('Tem certeza de que deseja zerar os contadores de estatísticas do Shield?')) {
+          await api.resetStats();
+          await loadData();
+        }
+      });
+
+      // Restore Defaults
+      btnRestoreDefaults.addEventListener('click', async () => {
+        if (confirm('Restaurar o conjunto padrão de regras do Núcleo Shield?')) {
+          await api.restoreDefaults();
+          await loadData();
+        }
+      });
+
+      // Open Test Fixture
+      btnOpenTestFixture.addEventListener('click', () => {
+        if (window.nucleoAPI?.navigate) {
+          window.nucleoAPI.navigate('nucleo://shield-test');
+        } else {
+          window.location.href = 'nucleo://shield-test';
+        }
+      });
+
+      // Initial load
+      await loadData();
+
+      // Listen for updates
+      if (api.onStateChanged) {
+        api.onStateChanged(() => loadData());
+      }
+      if (api.onWhitelistChanged) {
+        api.onWhitelistChanged(() => loadData());
+      }
+    });
+  </script>
+</body>
+</html>

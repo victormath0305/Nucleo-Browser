@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Histórico — Núcleo</title>
+  <link rel="stylesheet" href="styles/theme.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Nav */
+    .manager-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      padding: 0 24px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-subtle);
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+    }
+
+    .brand-logo {
+      width: 24px;
+      height: 24px;
+      filter: drop-shadow(0 0 8px var(--accent-cyan-glow));
+    }
+
+    .brand-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .page-title {
+      font-size: 14px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      margin-left: 4px;
+    }
+
+    /* Search */
+    .search-box {
+      flex: 1;
+      max-width: 480px;
+      display: flex;
+      align-items: center;
+      background: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 6px 12px;
+      gap: 8px;
+      transition: all var(--trans-fast);
+    }
+
+    .search-box:focus-within {
+      background: var(--bg-input-focus);
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 2px var(--accent-cyan-subtle);
+    }
+
+    .search-box svg {
+      width: 15px;
+      height: 15px;
+      fill: none;
+      stroke: var(--text-muted);
+      stroke-width: 2;
+    }
+
+    .search-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-primary);
+      font-size: 13px;
+      font-family: inherit;
+    }
+
+    /* Actions */
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: rgba(255, 71, 87, 0.1);
+      border: 1px solid rgba(255, 71, 87, 0.3);
+      border-radius: 6px;
+      color: #ff6b81;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--trans-fast);
+    }
+
+    .btn-action:hover {
+      background: rgba(255, 71, 87, 0.2);
+      border-color: var(--status-danger);
+      color: #ffffff;
+    }
+
+    /* Main Container */
+    .main-container {
+      max-width: 860px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 28px 24px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    /* Chronological Groups */
+    .group-section {
+      margin-bottom: 28px;
+    }
+
+    .group-title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--accent-cyan);
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .group-count {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .history-card {
+      display: flex;
+      align-items: center;
+      padding: 9px 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      gap: 12px;
+      transition: all var(--trans-fast);
+    }
+
+    .history-card:hover {
+      background: var(--bg-tertiary);
+      border-color: rgba(255, 255, 255, 0.14);
+      transform: translateX(2px);
+    }
+
+    .time-badge {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      font-family: var(--font-family-mono);
+      min-width: 44px;
+      flex-shrink: 0;
+    }
+
+    .hist-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .hist-icon img {
+      width: 16px;
+      height: 16px;
+      border-radius: 2px;
+    }
+
+    .hist-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .hist-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .hist-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .hist-url {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .visit-badge {
+      font-size: 10px;
+      color: var(--accent-cyan);
+      background: var(--accent-cyan-subtle);
+      padding: 1px 5px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .hist-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .btn-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all var(--trans-fast);
+    }
+
+    .btn-icon:hover {
+      background: var(--bg-hover);
+      color: var(--accent-cyan);
+    }
+
+    .btn-icon.danger:hover {
+      background: rgba(255, 71, 87, 0.15);
+      color: var(--status-danger);
+    }
+
+    .btn-icon svg {
+      width: 13px;
+      height: 13px;
+      fill: currentColor;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 0;
+      color: var(--text-muted);
+      gap: 12px;
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      stroke: var(--text-disabled);
+      stroke-width: 1.5;
+      fill: none;
+    }
+
+    /* Clear Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(8px);
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-box {
+      width: 400px;
+      background: #121826;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 22px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .period-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .period-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      color: var(--text-primary);
+      cursor: pointer;
+      font-size: 13px;
+      transition: all var(--trans-fast);
+    }
+
+    .period-btn:hover {
+      background: rgba(255, 71, 87, 0.12);
+      border-color: rgba(255, 71, 87, 0.4);
+      color: #ff6b81;
+    }
+
+    .modal-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .btn-secondary {
+      padding: 6px 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <header class="manager-header">
+    <div class="brand-section" id="btnBackHome">
+      <img src="../assets/icons/icon-32.png" alt="Logo" class="brand-logo">
+      <span class="brand-title">Núcleo</span>
+      <span class="page-title">/ Histórico</span>
+    </div>
+
+    <div class="search-box">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="searchInput" class="search-input" placeholder="Pesquisar histórico..." autocomplete="off">
+    </div>
+
+    <div>
+      <button class="btn-action" id="btnClearHistoryBtn">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M 5.5 5.5 L 5.5 11.5 M 10.5 5.5 L 10.5 11.5 M 2.5 3.5 L 13.5 3.5 M 6.5 1.5 L 9.5 1.5 L 10.5 3.5 L 5.5 3.5 Z M 3.5 3.5 L 3.5 13.5 A 1 1 0 0 0 4.5 14.5 L 11.5 14.5 A 1 1 0 0 0 12.5 13.5 L 12.5 3.5"/></svg>
+        Limpar Dados
+      </button>
+    </div>
+  </header>
+
+  <main class="main-container" id="historyContainer">
+    <!-- Chronological Groups Dynamic Injected -->
+  </main>
+
+  <!-- Clear Period Modal -->
+  <div class="modal-overlay" id="clearModal">
+    <div class="modal-box">
+      <h3 class="modal-title">Limpar Histórico de Navegação</h3>
+      <p style="font-size: 12px; color: var(--text-muted);">Selecione o intervalo de tempo que deseja remover:</p>
+      <div class="period-options">
+        <button class="period-btn" data-period="last15Minutes">Últimos 15 minutos <span>➔</span></button>
+        <button class="period-btn" data-period="today">Hoje <span>➔</span></button>
+        <button class="period-btn" data-period="last7Days">Últimos 7 dias <span>➔</span></button>
+        <button class="period-btn" data-period="all" style="color: var(--status-danger); border-color: rgba(255, 71, 87, 0.4);">Todo o histórico (Completo) <span>➔</span></button>
+      </div>
+      <div class="modal-buttons">
+        <button class="btn-secondary" id="clearModalCancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const api = window.nucleoAPI;
+    const historyContainer = document.getElementById('historyContainer');
+    const searchInput = document.getElementById('searchInput');
+    const clearModal = document.getElementById('clearModal');
+    const btnClearHistoryBtn = document.getElementById('btnClearHistoryBtn');
+    const clearModalCancel = document.getElementById('clearModalCancel');
+
+    let currentEntries = [];
+
+    async function loadHistory(query = '') {
+      if (!api?.history) return;
+      const res = await api.history.search(query, { limit: 300, offset: 0 });
+      currentEntries = res.entries || [];
+      renderHistory(currentEntries);
+    }
+
+    function formatTime(timestamp) {
+      const d = new Date(timestamp);
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }
+
+    function groupEntriesByDate(entries) {
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const startOfYesterday = startOfToday - (24 * 60 * 60 * 1000);
+      const startOf7Days = startOfToday - (6 * 24 * 60 * 60 * 1000);
+
+      const groups = {
+        today: [],
+        yesterday: [],
+        week: [],
+        older: []
+      };
+
+      entries.forEach(e => {
+        const t = e.lastVisitTime;
+        if (t >= startOfToday) {
+          groups.today.push(e);
+        } else if (t >= startOfYesterday) {
+          groups.yesterday.push(e);
+        } else if (t >= startOf7Days) {
+          groups.week.push(e);
+        } else {
+          groups.older.push(e);
+        }
+      });
+
+      return [
+        { title: 'Hoje', items: groups.today },
+        { title: 'Ontem', items: groups.yesterday },
+        { title: 'Últimos 7 dias', items: groups.week },
+        { title: 'Mais antigos', items: groups.older }
+      ].filter(g => g.items.length > 0);
+    }
+
+    function renderHistory(entries) {
+      historyContainer.innerHTML = '';
+
+      if (entries.length === 0) {
+        historyContainer.innerHTML = `
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Nenhum registro de histórico encontrado</span>
+          </div>
+        `;
+        return;
+      }
+
+      const grouped = groupEntriesByDate(entries);
+
+      grouped.forEach(group => {
+        const groupEl = document.createElement('section');
+        groupEl.className = 'group-section';
+        groupEl.innerHTML = `
+          <div class="group-title">
+            <span>${group.title}</span>
+            <span class="group-count">${group.items.length} ${group.items.length === 1 ? 'página' : 'páginas'}</span>
+          </div>
+          <div class="history-list"></div>
+        `;
+
+        const listEl = groupEl.querySelector('.history-list');
+
+        group.items.forEach(e => {
+          const card = document.createElement('div');
+          card.className = 'history-card';
+          card.innerHTML = `
+            <span class="time-badge">${formatTime(e.lastVisitTime)}</span>
+            <div class="hist-icon">
+              ${e.favicon ? `<img src="${e.favicon}" alt="" onerror="this.parentElement.innerHTML='🌐'">` : '🌐'}
+            </div>
+            <div class="hist-info">
+              <span class="hist-title">${e.title || e.url}</span>
+              <div class="hist-meta">
+                <span class="hist-url">${e.url}</span>
+                ${e.visitCount > 1 ? `<span class="visit-badge">${e.visitCount}x</span>` : ''}
+              </div>
+            </div>
+            <div class="hist-actions">
+              <button class="btn-icon" title="Abrir em nova aba" data-action="open">
+                <svg viewBox="0 0 16 16"><path d="M 9 2 L 14 2 L 14 7 M 6 10 L 14 2 M 13 9 L 13 13 A 1 1 0 0 1 12 14 L 3 14 A 1 1 0 0 1 2 13 L 2 4 A 1 1 0 0 1 3 3 L 7 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </button>
+              <button class="btn-icon danger" title="Remover do histórico" data-action="delete">
+                <svg viewBox="0 0 16 16"><path d="M 2 2 L 14 14 M 14 2 L 2 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          `;
+
+          card.querySelector('.hist-info').addEventListener('click', () => {
+            if (api?.navigate) {
+              api.navigate(e.url);
+            } else {
+              window.location.href = e.url;
+            }
+          });
+
+          card.querySelector('[data-action="open"]').addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            api.createTab(e.url);
+          });
+
+          card.querySelector('[data-action="delete"]').addEventListener('click', async (ev) => {
+            ev.stopPropagation();
+            await api.history.delete(e.id);
+            await loadHistory(searchInput.value);
+          });
+
+          listEl.appendChild(card);
+        });
+
+        historyContainer.appendChild(groupEl);
+      });
+    }
+
+    searchInput.addEventListener('input', () => {
+      loadHistory(searchInput.value);
+    });
+
+    btnClearHistoryBtn.addEventListener('click', () => {
+      clearModal.classList.add('open');
+    });
+
+    clearModalCancel.addEventListener('click', () => {
+      clearModal.classList.remove('open');
+    });
+
+    document.querySelectorAll('.period-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const period = btn.getAttribute('data-period');
+        const labels = {
+          last15Minutes: 'últimos 15 minutos',
+          today: 'histórico de hoje',
+          last7Days: 'últimos 7 dias',
+          all: 'TODO o histórico'
+        };
+
+        if (confirm(`Deseja realmente limpar ${labels[period]}?`)) {
+          await api.history.clear(period);
+          clearModal.classList.remove('open');
+          await loadHistory();
+        }
+      });
+    });
+
+    if (api?.history?.onUpdated) {
+      api.history.onUpdated(() => loadHistory(searchInput.value));
+    }
+
+    document.getElementById('btnBackHome')?.addEventListener('click', () => {
+      window.location.href = 'nucleo://newtab';
+    });
+
+    window.addEventListener('DOMContentLoaded', () => loadHistory());
+  </script>
+</body>
+</html>

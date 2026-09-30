@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Test Popup</title>
+  <style>
+    body {
+      width: 240px;
+      margin: 0;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0a0d14;
+      color: #f1f5f9;
+      border: 1px solid #1e293b;
+      box-sizing: border-box;
+    }
+    h3 {
+      margin: 0 0 8px 0;
+      color: #00e5ff;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    p {
+      font-size: 12px;
+      color: #94a3b8;
+      margin: 0 0 12px 0;
+      line-height: 1.4;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      background: rgba(0, 229, 255, 0.15);
+      color: #00e5ff;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <h3>⚡ Núcleo Test Action</h3>
+  <p>Popup de extensão nativa carregado com sucesso via Chromium/Electron.</p>
+  <div class="status-badge" id="popup-status">Status: Operacional</div>
+  <script src="popup.js"></script>
+</body>
+</html>

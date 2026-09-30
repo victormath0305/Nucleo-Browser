@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Extension Test Fixture — Núcleo</title>
+  <link rel="stylesheet" href="styles/theme.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary, #0a0d14);
+      color: var(--text-primary, #e2e8f0);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 40px 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header {
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header h1 {
+      font-size: 22px;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header .tag {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(0, 229, 255, 0.15);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      color: var(--accent-cyan, #00e5ff);
+      font-weight: 600;
+    }
+
+    .card {
+      background: #121826;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .card h2 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .status-box {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-box.waiting {
+      background: rgba(148, 163, 184, 0.1);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      color: #94a3b8;
+    }
+
+    .status-box.success {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #34d399;
+    }
+
+    .status-box.fail {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #f87171;
+    }
+
+    .btn {
+      align-self: flex-start;
+      padding: 8px 16px;
+      background: var(--accent-cyan, #00e5ff);
+      color: #0a0d14;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn:hover {
+      background: #38bdf8;
+    }
+
+    .checklist {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+
+    .check-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .check-badge.pass {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .check-badge.fail {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>
+        Ambiente de Teste de Extensões
+        <span class="tag">Offline Fixture</span>
+      </h1>
+      <a href="nucleo://extensions" style="color: var(--accent-cyan, #00e5ff); font-size: 12px; text-decoration: none;">&larr; Voltar para Extensões</a>
+    </div>
+
+    <!-- Content Script Injection Card -->
+    <div class="card" id="test-target-container">
+      <h2>1. Verificação de Injeção de Content Script</h2>
+      <p style="font-size: 12px; color: #94a3b8;">
+        Quando a extensão fixture "Núcleo Test Extension" está instalada e ativa, seu script <code>content.js</code> é executado neste documento e injeta o elemento <code>#nucleo-extension-test-badge</code>.
+      </p>
+
+      <div class="status-box waiting" id="injectionStatusBox">
+        <span id="injectionStatusText">Aguardando injeção do content script...</span>
+      </div>
+
+      <button class="btn" id="btnCheckInjection">Verificar Novamente</button>
+    </div>
+
+    <!-- Security & Isolation Checklist -->
+    <div class="card">
+      <h2>2. Verificação de Isolamento e Segurança</h2>
+      <p style="font-size: 12px; color: #94a3b8;">
+        Garante que APIs de sistema operacional e Node.js privilegiadas não estejam expostas ao contexto do documento.
+      </p>
+
+      <div class="checklist" id="securityChecklist">
+        <!-- Injected via JS -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function checkContentScript() {
+      const badge = document.getElementById('nucleo-extension-test-badge');
+      const windowFlag = Boolean(window.__NUCLEO_EXTENSION_ACTIVE__);
+      const statusBox = document.getElementById('injectionStatusBox');
+      const statusText = document.getElementById('injectionStatusText');
+
+      if (badge || windowFlag) {
+        statusBox.className = 'status-box success';
+        statusText.innerHTML = '✔ <strong>Aprovado:</strong> Content Script executado com sucesso! Elemento injetado e ativo no DOM.';
+        return true;
+      } else {
+        statusBox.className = 'status-box waiting';
+        statusText.innerHTML = '○ Content script ainda não detectado nesta aba. Verifique se a extensão fixture está instalada e ativada em nucleo://extensions.';
+        return false;
+      }
+    }
+
+    function checkSecurityIsolation() {
+      const tests = [
+        { label: 'require é indefinido no renderer web', pass: typeof require === 'undefined' },
+        { label: 'process.versions.node é indefinido ou protegido', pass: typeof process === 'undefined' || !process.versions?.node },
+        { label: 'child_process não está acessível', pass: typeof child_process === 'undefined' },
+        { label: 'fs (Node.js) não está acessível', pass: typeof fs === 'undefined' },
+        { label: 'module / exports não vazaram para o escopo global', pass: typeof module === 'undefined' }
+      ];
+
+      const list = document.getElementById('securityChecklist');
+      list.innerHTML = tests.map(t => `
+        <div class="check-item">
+          <span class="check-badge ${t.pass ? 'pass' : 'fail'}">${t.pass ? 'SEGURO' : 'FALHA'}</span>
+          <span>${t.label}</span>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('btnCheckInjection').addEventListener('click', checkContentScript);
+
+    // Run security check
+    checkSecurityIsolation();
+
+    // Check injection immediately and delayed
+    checkContentScript();
+    setTimeout(checkContentScript, 300);
+    setTimeout(checkContentScript, 1000);
+  </script>
+</body>
+</html>

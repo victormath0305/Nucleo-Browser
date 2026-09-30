@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' nucleo: data: blob: http: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; font-src 'self';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shield Test Fixture — Núcleo Browser</title>
+  <link rel="stylesheet" href="styles/theme.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary, #0a0d14);
+      color: var(--text-primary, #e2e8f0);
+      font-family: var(--font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+      padding: 32px 24px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-title h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .badge-test {
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .description {
+      font-size: 13.5px;
+      color: var(--text-secondary, #94a3b8);
+    }
+
+    .controls-card {
+      background: var(--bg-secondary, #121826);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+      border-radius: 12px;
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .btn {
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 150ms ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: var(--accent-cyan, #00e5ff);
+      color: #0a0d14;
+    }
+
+    .btn-primary:hover {
+      background: #33ebff;
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-primary, #e2e8f0);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .stat-box {
+      background: var(--bg-secondary, #121826);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-secondary, #94a3b8);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .stat-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .stat-box.highlight .stat-value {
+      color: var(--accent-cyan, #00e5ff);
+    }
+
+    /* Test Results Table */
+    .table-container {
+      background: var(--bg-secondary, #121826);
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    th {
+      background: rgba(0, 0, 0, 0.25);
+      padding: 12px 16px;
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary, #94a3b8);
+      border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-primary, #e2e8f0);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .status-blocked {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .status-allowed {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-pass {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+      border: 1px solid #10b981;
+    }
+
+    .status-fail {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+      border: 1px solid #ef4444;
+    }
+
+    .status-pending {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-secondary, #94a3b8);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .url-cell {
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--accent-cyan, #00e5ff);
+      word-break: break-all;
+    }
+
+    /* Live Logs */
+    .log-card {
+      background: #06090e;
+      border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+      border-radius: 10px;
+      padding: 14px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 180px;
+      overflow-y: auto;
+      color: #94a3b8;
+    }
+
+    .log-card div {
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="header-title">
+        <h1>Ambiente de Testes do Shield</h1>
+        <span class="badge-test">Determinístico</span>
+      </div>
+      <button class="btn btn-secondary" id="btnBackToShield" title="Ir para as configurações do Shield">
+        Configurações do Shield
+      </button>
+    </header>
+
+    <p class="description">
+      Esta página simula disparos determinísticos de requisições conhecidas de publicidade e rastreamento para validar o motor nativo do Núcleo Shield sem requisições a terceiros.
+    </p>
+
+    <!-- Controls -->
+    <div class="controls-card">
+      <div>
+        <h4 style="color: #ffffff; margin-bottom: 2px;">Execução da Bateria</h4>
+        <span style="font-size: 12.5px; color: #94a3b8;">Dispara requisições e verifica o cancelamento na camada de rede Chromium.</span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn btn-primary" id="btnRunTests">Executar Testes</button>
+      </div>
+    </div>
+
+    <!-- Live Tab Stats -->
+    <div class="stats-row">
+      <div class="stat-box highlight">
+        <span class="stat-label">Bloqueios nesta aba</span>
+        <span class="stat-value" id="tabBlockedCount">0</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-label">Anúncios</span>
+        <span class="stat-value" id="tabAdsCount">0</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-label">Rastreadores</span>
+        <span class="stat-value" id="tabTrackersCount">0</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-label">Total Analisado</span>
+        <span class="stat-value" id="tabAnalyzedCount">0</span>
+      </div>
+    </div>
+
+    <!-- Test Cases Table -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Caso de Teste</th>
+            <th>URL Simulada</th>
+            <th>Esperado</th>
+            <th>Obtido</th>
+            <th>Resultado</th>
+          </tr>
+        </thead>
+        <tbody id="testTableBody">
+          <!-- Injected via script -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Console Log -->
+    <div>
+      <h4 style="font-size: 13px; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">Log de Execução</h4>
+      <div class="log-card" id="logContainer">
+        <div>[Pronto] Pressione "Executar Testes" para iniciar a verificação de integridade do Núcleo Shield.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const api = window.nucleoAPI?.shield;
+      const logContainer = document.getElementById('logContainer');
+      const testTableBody = document.getElementById('testTableBody');
+      const btnRunTests = document.getElementById('btnRunTests');
+      const btnBackToShield = document.getElementById('btnBackToShield');
+      const tabBlockedCount = document.getElementById('tabBlockedCount');
+      const tabAdsCount = document.getElementById('tabAdsCount');
+      const tabTrackersCount = document.getElementById('tabTrackersCount');
+      const tabAnalyzedCount = document.getElementById('tabAnalyzedCount');
+
+      const testCases = [
+        {
+          id: 'test-ad-domain',
+          name: 'Domínio de Anúncio Exato',
+          url: 'http://shield-test-blocked.local/banner.jpg',
+          expected: 'BLOCK',
+          category: 'ads'
+        },
+        {
+          id: 'test-doubleclick',
+          name: 'Rede de Publicidade (DoubleClick)',
+          url: 'http://doubleclick.net/ad.js',
+          expected: 'BLOCK',
+          category: 'ads'
+        },
+        {
+          id: 'test-google-analytics',
+          name: 'Rastreador Conhecido (Google Analytics)',
+          url: 'http://google-analytics.com/analytics.js',
+          expected: 'BLOCK',
+          category: 'trackers'
+        },
+        {
+          id: 'test-url-pattern',
+          name: 'Padrão de Caminho de Teste',
+          url: 'http://example.com/shield-test/banner.jpg',
+          expected: 'BLOCK',
+          category: 'ads'
+        },
+        {
+          id: 'test-clean-resource',
+          name: 'Recurso Limpo (Não Bloqueado)',
+          url: 'nucleo://assets/icons/icon-32.png',
+          expected: 'ALLOW',
+          category: 'none'
+        }
+      ];
+
+      function log(msg) {
+        const time = new Date().toLocaleTimeString();
+        const line = document.createElement('div');
+        line.textContent = `[${time}] ${msg}`;
+        logContainer.appendChild(line);
+        logContainer.scrollTop = logContainer.scrollHeight;
+      }
+
+      function renderInitialTable() {
+        testTableBody.innerHTML = '';
+        testCases.forEach((tc) => {
+          const row = document.createElement('tr');
+          row.id = `row-${tc.id}`;
+          row.innerHTML = `
+            <td><strong>${tc.name}</strong></td>
+            <td class="url-cell">${tc.url}</td>
+            <td><span class="status-badge ${tc.expected === 'BLOCK' ? 'status-blocked' : 'status-allowed'}">${tc.expected === 'BLOCK' ? 'Bloquear' : 'Permitir'}</span></td>
+            <td id="obtained-${tc.id}"><span class="status-badge status-pending">Pendente</span></td>
+            <td id="result-${tc.id}"><span class="status-badge status-pending">—</span></td>
+          `;
+          testTableBody.appendChild(row);
+        });
+      }
+
+      async function refreshTabStats() {
+        if (!api) return;
+        try {
+          const stats = await api.getTabStats();
+          if (stats) {
+            tabBlockedCount.textContent = stats.totalBlocked || 0;
+            tabAdsCount.textContent = stats.adsBlocked || 0;
+            tabTrackersCount.textContent = stats.trackersBlocked || 0;
+            tabAnalyzedCount.textContent = stats.analyzed || 0;
+          }
+        } catch (err) {
+          console.warn('Error reading tab stats:', err);
+        }
+      }
+
+      async function runTestItem(tc) {
+        log(`Testando: ${tc.name} (${tc.url})...`);
+        const obtainedCell = document.getElementById(`obtained-${tc.id}`);
+        const resultCell = document.getElementById(`result-${tc.id}`);
+
+        let wasBlocked = false;
+
+        // Attempt fetch with short timeout
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 1200);
+
+          await fetch(tc.url, {
+            mode: 'no-cors',
+            signal: controller.signal
+          });
+          clearTimeout(timeout);
+          wasBlocked = false;
+        } catch (err) {
+          // If aborted due to network cancellation ERR_BLOCKED_BY_CLIENT, it's blocked!
+          // Note: When Electron onBeforeRequest cancels, fetch immediately throws
+          wasBlocked = true;
+        }
+
+        const actionObtained = wasBlocked ? 'BLOCK' : 'ALLOW';
+        const isPass = (actionObtained === tc.expected);
+
+        obtainedCell.innerHTML = `
+          <span class="status-badge ${wasBlocked ? 'status-blocked' : 'status-allowed'}">
+            ${wasBlocked ? 'Bloqueado' : 'Permitido'}
+          </span>
+        `;
+
+        resultCell.innerHTML = `
+          <span class="status-badge ${isPass ? 'status-pass' : 'status-fail'}">
+            ${isPass ? 'PASSOU ✓' : 'FALHOU ✗'}
+          </span>
+        `;
+
+        log(`Resultado ${tc.name}: ${actionObtained} (Esperado: ${tc.expected}) -> ${isPass ? 'PASS' : 'FAIL'}`);
+      }
+
+      async function executeAllTests() {
+        btnRunTests.disabled = true;
+        btnRunTests.textContent = 'Executando...';
+        log('--- Iniciando bateria de testes do Núcleo Shield ---');
+
+        for (const tc of testCases) {
+          await runTestItem(tc);
+          await refreshTabStats();
+          // Short delay between requests
+          await new Promise((r) => setTimeout(r, 100));
+        }
+
+        log('--- Bateria concluída com sucesso! ---');
+        btnRunTests.disabled = false;
+        btnRunTests.textContent = 'Executar Novamente';
+        await refreshTabStats();
+      }
+
+      btnRunTests.addEventListener('click', executeAllTests);
+
+      btnBackToShield.addEventListener('click', () => {
+        if (window.nucleoAPI?.navigate) {
+          window.nucleoAPI.navigate('nucleo://shield');
+        } else {
+          window.location.href = 'nucleo://shield';
+        }
+      });
+
+      renderInitialTable();
+      await refreshTabStats();
+
+      // Listen for tab stats updates from main process
+      if (api?.onTabStatsUpdated) {
+        api.onTabStatsUpdated(() => {
+          refreshTabStats();
+        });
+      }
+    });
+  </script>
+</body>
+</html>
