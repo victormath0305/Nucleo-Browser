@@ -10,7 +10,12 @@
     "generate-icons": "electron scripts/generate-icons.js",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "build": "electron-builder"
+    "dist:installer": "node scripts/build-installer.js --nsis",
+    "dist:open": "node scripts/build-installer.js --nsis --open",
+    "dist:run": "node scripts/build-installer.js --nsis --run",
+    "dist:portable": "node scripts/build-installer.js --portable",
+    "build": "electron-builder",
+    "build:installer": "node scripts/build-installer.js --nsis"
   },
   "keywords": [
     "browser",

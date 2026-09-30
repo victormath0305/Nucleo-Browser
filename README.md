@@ -281,6 +281,26 @@ Para gerar o instalador portátil / instalador NSIS completo:
 npm run dist
 ```
 
+Para gerar rapidamente apenas o instalador NSIS do Windows:
+```bash
+npm run dist:installer
+```
+
+Para compilar o instalador e abrir a pasta de saída (`dist/`):
+```bash
+npm run dist:open
+```
+
+Para compilar e iniciar o instalador automaticamente para teste imediato:
+```bash
+npm run dist:run
+```
+
+O instalador gerado estará localizado em:
+```text
+dist/Núcleo Browser Setup 0.6.0.exe
+```
+
 ---
 
 ## 7. Roadmap Evolutivo do Projeto
