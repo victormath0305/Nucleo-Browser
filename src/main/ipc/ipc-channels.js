@@ -132,6 +132,15 @@ const IPC_CHANNELS = {
   DOWNLOADS_CLEAR: 'downloads:clear',
   DOWNLOADS_GET_ACTIVE_COUNT: 'downloads:get-active-count',
 
+  // Permissions commands
+  PERMISSIONS_LIST: 'permissions:list',
+  PERMISSIONS_GET_FOR_ORIGIN: 'permissions:get-for-origin',
+  PERMISSIONS_SET: 'permissions:set',
+  PERMISSIONS_RESET: 'permissions:reset',
+  PERMISSIONS_RESET_ORIGIN: 'permissions:reset-origin',
+  PERMISSIONS_RESET_ALL: 'permissions:reset-all',
+  PERMISSIONS_RESOLVE_REQUEST: 'permissions:resolve-request',
+
   // System & About info
   SYSTEM_GET_ABOUT_INFO: 'system:get-about-info',
 
@@ -159,7 +168,10 @@ const IPC_CHANNELS = {
   EVENT_DOWNLOADS_CREATED: 'event:downloads-created',
   EVENT_DOWNLOADS_UPDATED: 'event:downloads-updated',
   EVENT_DOWNLOADS_DONE: 'event:downloads-done',
-  EVENT_DOWNLOADS_CLEARED: 'event:downloads-cleared'
+  EVENT_DOWNLOADS_CLEARED: 'event:downloads-cleared',
+  EVENT_PERMISSIONS_CHANGED: 'event:permissions-changed',
+  EVENT_PERMISSIONS_REQUEST: 'event:permissions-request',
+  EVENT_PERMISSIONS_RESOLVED: 'event:permissions-resolved'
 };
 
 module.exports = IPC_CHANNELS;

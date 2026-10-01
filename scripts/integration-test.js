@@ -22,6 +22,7 @@ const { SearchProvider } = require('../src/main/modules/search');
 const { DefaultBrowserManager } = require('../src/main/modules/default-browser');
 const { WorkspaceManager, WorkspaceStore } = require('../src/main/modules/workspaces');
 const { DownloadsManager, DownloadsStore } = require('../src/main/modules/downloads');
+const { PermissionsManager, PermissionsStore } = require('../src/main/modules/permissions');
 const IpcHandlerRegistry = require('../src/main/ipc/ipc-handlers');
 
 const tempBmPath = path.join(os.tmpdir(), `nucleo-int-bm-${Date.now()}.json`);
@@ -31,10 +32,11 @@ const tempExtPath = path.join(os.tmpdir(), `nucleo-int-ext-${Date.now()}.json`);
 const tempSettingsPath = path.join(os.tmpdir(), `nucleo-int-settings-${Date.now()}.json`);
 const tempWsPath = path.join(os.tmpdir(), `nucleo-int-ws-${Date.now()}.json`);
 const tempDlPath = path.join(os.tmpdir(), `nucleo-int-dl-${Date.now()}.json`);
+const tempPermsPath = path.join(os.tmpdir(), `nucleo-int-perms-${Date.now()}.json`);
 const tempExtDir = path.join(os.tmpdir(), `nucleo-int-ext-dir-${Date.now()}`);
 
 app.whenReady().then(async () => {
-  console.log('--- Initializing Integration Test Environment (v0.8.0 Downloads, Workspaces, Settings, Extensions & Shield) ---');
+  console.log('--- Initializing Integration Test Environment (v0.9.0 Permissions, Downloads, Workspaces, Settings, Extensions & Shield) ---');
   await fs.promises.mkdir(tempExtDir, { recursive: true });
 
   const engine = new BrowserEngine();
@@ -77,6 +79,10 @@ app.whenReady().then(async () => {
   });
   await downloadsManager.initialize();
 
+  const permissionsStore = new PermissionsStore(tempPermsPath);
+  const permissionsManager = new PermissionsManager(permissionsStore);
+  await permissionsManager.initialize();
+
   const windowController = new BrowserWindowController();
   const tabManager = new TabManager(
     windowController,
@@ -93,6 +99,7 @@ app.whenReady().then(async () => {
 
   shieldManager.attachToSession(engine.getSession(), tabManager, windowController);
   downloadsManager.attachToSession(engine.getSession());
+  permissionsManager.attachToSession(engine.getSession(), windowController, tabManager);
 
   const navigationController = new NavigationController(tabManager, searchProvider);
   const ipcRegistry = new IpcHandlerRegistry({
@@ -109,6 +116,7 @@ app.whenReady().then(async () => {
     defaultBrowserManager,
     workspaceManager,
     downloadsManager,
+    permissionsManager,
     browserEngine: engine
   });
   ipcRegistry.registerAll();
@@ -548,6 +556,57 @@ app.whenReady().then(async () => {
   console.assert(completedDl && completedDl.state === 'completed', 'Test 16.6 Failed: Download should be completed');
   console.log('✔ Ciclo de download concluído e persistido com sucesso no histórico');
 
+  // [Test 17] Site Permissions & Privacy Central
+  console.log('\n[Test 17] Site Permissions & Privacy Central — nucleo://privacy, Interceptação, Prompt e Persistência...');
+  
+  // 17.1: Open nucleo://privacy
+  const tabPrivacy = tabManager.createTab('nucleo://privacy', true);
+  await new Promise((r) => tabPrivacy.view.webContents.once('did-finish-load', r));
+  const privacyTitle = tabPrivacy.view.webContents.getTitle();
+  console.assert(privacyTitle.includes('Privacidade') || privacyTitle.includes('Permissões'), `Test 17.1 Failed: Title should include Privacidade/Permissões, got ${privacyTitle}`);
+  console.log(`   Privacy URL: nucleo://privacy/ | Title: ${privacyTitle}`);
+
+  // 17.2: Verify nucleo://privacy does NOT get recorded in history
+  const privacyHistoryEntries = historyManager.getAllEntries();
+  const privacyInHistory = privacyHistoryEntries.find(h => h.url.includes('privacy') || h.url.includes('permissions'));
+  console.assert(!privacyInHistory, 'Test 17.2 Failed: nucleo://privacy should NOT be recorded in history');
+  console.log('✔ nucleo://privacy isolado e excluído do histórico com sucesso');
+
+  // 17.3: Test site permission prompt & resolution via session
+  let promptReceived = null;
+  permissionsManager.once('permission-prompt', (p) => {
+    promptReceived = p;
+  });
+
+  let callbackResult = null;
+  const mockCb = (res) => { callbackResult = res; };
+
+  // Trigger permission request for camera from https://meet.google.com
+  permissionsManager._handlePermissionRequest(tabPrivacy.view.webContents, 'camera', mockCb, { requestingUrl: 'https://meet.google.com' });
+  console.assert(promptReceived !== null, 'Test 17.3 Failed: permission-prompt was not emitted');
+  console.assert(promptReceived.origin === 'https://meet.google.com', 'Test 17.3 Failed: Prompt origin mismatch');
+  console.assert(promptReceived.permission === 'camera', 'Test 17.3 Failed: Prompt permission mismatch');
+
+  // Resolve with 'allow'
+  await permissionsManager.resolveRequest(promptReceived.requestId, 'allow');
+  console.assert(callbackResult === true, 'Test 17.4 Failed: Callback should be true');
+
+  const meetPerms = permissionsManager.getPermissionsForOrigin('https://meet.google.com');
+  console.assert(meetPerms.camera === 'allow', 'Test 17.5 Failed: Camera should be allow');
+  console.log('✔ Solicitação de permissão de câmera interceptada e aprovada com sucesso para https://meet.google.com');
+
+  // 17.4: Test permission check handler
+  const checkResult = permissionsManager._handlePermissionCheck(tabPrivacy.view.webContents, 'camera', 'https://meet.google.com');
+  console.assert(checkResult === true, 'Test 17.6 Failed: Permission check should return true for allowed permission');
+  console.log('✔ setPermissionCheckHandler validado com sucesso');
+
+  // 17.5: Reset origin and verify persistence cleanup
+  await permissionsManager.resetOrigin('https://meet.google.com');
+  const checkResultAfterReset = permissionsManager._handlePermissionCheck(tabPrivacy.view.webContents, 'camera', 'https://meet.google.com');
+  console.assert(checkResultAfterReset === false, 'Test 17.7 Failed: Permission check should return false after reset');
+  console.assert(permissionsManager.listPermissions().length === 0, 'Test 17.8 Failed: Permissions list should be empty after reset');
+  console.log('✔ Reset de permissões por origem e limpeza de armazenamento verificados');
+
   console.log('\n--- Teardown ---');
   tabManager.destroyAll();
   windowController.close();
@@ -561,6 +620,7 @@ app.whenReady().then(async () => {
     if (fs.existsSync(tempSettingsPath)) fs.unlinkSync(tempSettingsPath);
     if (fs.existsSync(tempWsPath)) fs.unlinkSync(tempWsPath);
     if (fs.existsSync(tempDlPath)) fs.unlinkSync(tempDlPath);
+    if (fs.existsSync(tempPermsPath)) fs.unlinkSync(tempPermsPath);
     if (fs.existsSync(tempExtDir)) fs.rmSync(tempExtDir, { recursive: true, force: true });
   } catch {}
 

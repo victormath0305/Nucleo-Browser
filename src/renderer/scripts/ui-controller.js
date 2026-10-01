@@ -73,10 +73,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   const menuShield = document.getElementById('menuShield');
   const menuExtensions = document.getElementById('menuExtensions');
   const menuDownloads = document.getElementById('menuDownloads');
+  const menuPrivacy = document.getElementById('menuPrivacy');
   const menuDevToolsWeb = document.getElementById('menuDevToolsWeb');
   const menuDevToolsUI = document.getElementById('menuDevToolsUI');
   const menuSettings = document.getElementById('menuSettings');
   const menuAbout = document.getElementById('menuAbout');
+
+  // DOM Elements - Site Permissions & Prompt
+  const sitePermissionsPopover = document.getElementById('sitePermissionsPopover');
+  const sitePermOrigin = document.getElementById('sitePermOrigin');
+  const sitePermSecurity = document.getElementById('sitePermSecurity');
+  const sitePermList = document.getElementById('sitePermList');
+  const btnSiteResetPerms = document.getElementById('btnSiteResetPerms');
+  const btnOpenPrivacyCenter = document.getElementById('btnOpenPrivacyCenter');
+
+  const permissionPrompt = document.getElementById('permissionPrompt');
+  const permPromptOrigin = document.getElementById('permPromptOrigin');
+  const permPromptLabel = document.getElementById('permPromptLabel');
+  const btnPromptDeny = document.getElementById('btnPromptDeny');
+  const btnPromptAllow = document.getElementById('btnPromptAllow');
 
   // DOM Elements - Context Menu
   const tabContextMenu = document.getElementById('tabContextMenu');
@@ -552,6 +567,204 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  if (menuPrivacy) {
+    menuPrivacy.addEventListener('click', () => {
+      menuDropdown?.classList.remove('show');
+      api.createTab('nucleo://privacy');
+    });
+  }
+
+  // --- Site Permissions & Privacy Helpers ---
+  function extractOrigin(url) {
+    if (!url || typeof url !== 'string') return '';
+    try {
+      const u = new URL(url);
+      if (u.protocol === 'http:' || u.protocol === 'https:') {
+        return u.origin.toLowerCase();
+      }
+      if (u.protocol === 'nucleo:') {
+        return `nucleo://${u.hostname.toLowerCase()}`;
+      }
+      return u.origin ? u.origin.toLowerCase() : url;
+    } catch {
+      return '';
+    }
+  }
+
+  const syncPermissionsBadgeForActiveTab = async (url = currentActiveTabUrl) => {
+    if (!api?.permissions || !securityBadge) return;
+    const origin = extractOrigin(url);
+    if (!origin || origin.startsWith('nucleo://')) {
+      securityBadge.classList.remove('has-custom-permissions');
+      return;
+    }
+
+    try {
+      const siteData = await api.permissions.getForOrigin(origin);
+      const perms = siteData?.permissions || {};
+      const hasCustom = Object.keys(perms).length > 0;
+      if (hasCustom) {
+        securityBadge.classList.add('has-custom-permissions');
+        securityBadge.title = `Permissões configuradas para ${origin} (clique para gerenciar)`;
+      } else {
+        securityBadge.classList.remove('has-custom-permissions');
+        if (url && url.startsWith('https://')) {
+          securityBadge.title = 'Conexão segura (HTTPS) — clique para ver permissões';
+        } else {
+          securityBadge.title = 'Conexão não segura — clique para ver permissões';
+        }
+      }
+    } catch {
+      securityBadge.classList.remove('has-custom-permissions');
+    }
+  };
+
+  const renderSitePermissionsPopover = async () => {
+    if (!sitePermissionsPopover || !api?.permissions) return;
+    const origin = extractOrigin(currentActiveTabUrl);
+    if (!origin) {
+      sitePermissionsPopover.style.display = 'none';
+      return;
+    }
+
+    if (sitePermOrigin) sitePermOrigin.textContent = origin;
+    const isSecure = origin.startsWith('https://') || origin.startsWith('nucleo://');
+    if (sitePermSecurity) {
+      sitePermSecurity.textContent = isSecure ? 'Conexão Segura (HTTPS)' : 'Conexão Não Criptografada';
+      sitePermSecurity.className = `site-perm-security ${isSecure ? 'secure' : 'insecure'}`;
+    }
+
+    try {
+      const siteData = await api.permissions.getForOrigin(origin);
+      const currentPerms = siteData?.permissions || {};
+
+      const items = [
+        { id: 'camera', label: 'Câmera', icon: '<path d="M 2 5 H 5 L 6.5 3 H 9.5 L 11 5 H 14 V 13 H 2 Z"/><circle cx="8" cy="9" r="2.5"/>' },
+        { id: 'microphone', label: 'Microfone', icon: '<rect x="5.5" y="2" width="5" height="8" rx="2.5"/><path d="M 3.5 7.5 A 4.5 4.5 0 0 0 12.5 7.5 M 8 12.5 V 14.5"/>' },
+        { id: 'geolocation', label: 'Localização', icon: '<path d="M 8 1.5 C 5.5 1.5 3.5 3.5 3.5 6 C 3.5 9.5 8 14.5 8 14.5 C 8 14.5 12.5 9.5 12.5 6 C 12.5 3.5 10.5 1.5 8 1.5 Z"/><circle cx="8" cy="6" r="1.5"/>' },
+        { id: 'notifications', label: 'Notificações', icon: '<path d="M 4 12 V 7 A 4 4 0 0 1 12 7 V 12 M 2 12 H 14 M 6.5 12 A 1.5 1.5 0 0 0 9.5 12"/>' },
+        { id: 'clipboard', label: 'Área de Transferência', icon: '<rect x="3" y="4" width="10" height="10" rx="1.5"/><path d="M 6 4 V 2 H 10 V 4"/>' }
+      ];
+
+      if (sitePermList) {
+        sitePermList.innerHTML = items.map((item) => {
+          const state = currentPerms[item.id] || 'ask';
+          return `
+            <div class="site-perm-row">
+              <div class="site-perm-label-wrap">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">${item.icon}</svg>
+                <span class="site-perm-label">${item.label}</span>
+              </div>
+              <select class="site-perm-select" data-perm="${item.id}">
+                <option value="allow" ${state === 'allow' ? 'selected' : ''}>Permitir</option>
+                <option value="deny" ${state === 'deny' ? 'selected' : ''}>Bloquear</option>
+                <option value="ask" ${state === 'ask' ? 'selected' : ''}>Perguntar</option>
+              </select>
+            </div>
+          `;
+        }).join('');
+
+        sitePermList.querySelectorAll('.site-perm-select').forEach((sel) => {
+          sel.addEventListener('change', async (e) => {
+            const perm = e.target.dataset.perm;
+            const val = e.target.value;
+            if (val === 'ask') {
+              await api.permissions.reset(origin, perm);
+            } else {
+              await api.permissions.set(origin, perm, val);
+            }
+            await syncPermissionsBadgeForActiveTab();
+          });
+        });
+      }
+    } catch (err) {
+      console.error('[Núcleo UI] Failed to load site permissions:', err);
+    }
+  };
+
+  if (securityBadge) {
+    securityBadge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isVisible = sitePermissionsPopover && sitePermissionsPopover.style.display === 'flex';
+      closeAllPopups();
+      if (!isVisible && sitePermissionsPopover) {
+        sitePermissionsPopover.style.display = 'flex';
+        renderSitePermissionsPopover();
+      }
+    });
+  }
+
+  if (btnSiteResetPerms) {
+    btnSiteResetPerms.addEventListener('click', async () => {
+      const origin = extractOrigin(currentActiveTabUrl);
+      if (!origin || !api?.permissions) return;
+      await api.permissions.resetOrigin(origin);
+      await renderSitePermissionsPopover();
+      await syncPermissionsBadgeForActiveTab();
+    });
+  }
+
+  if (btnOpenPrivacyCenter) {
+    btnOpenPrivacyCenter.addEventListener('click', () => {
+      if (sitePermissionsPopover) sitePermissionsPopover.style.display = 'none';
+      api.createTab('nucleo://privacy');
+    });
+  }
+
+  // --- Permission Request Interactive Prompt ---
+  let activePermissionRequest = null;
+
+  if (api?.permissions?.onRequest) {
+    api.permissions.onRequest((req) => {
+      activePermissionRequest = req;
+      if (permissionPrompt && permPromptOrigin && permPromptLabel) {
+        permPromptOrigin.textContent = req.origin;
+        permPromptLabel.textContent = req.meta?.label || req.permission;
+        permissionPrompt.style.display = 'flex';
+      }
+    });
+  }
+
+  if (btnPromptAllow) {
+    btnPromptAllow.addEventListener('click', async () => {
+      if (!activePermissionRequest) return;
+      const reqId = activePermissionRequest.requestId;
+      activePermissionRequest = null;
+      if (permissionPrompt) permissionPrompt.style.display = 'none';
+      await api.permissions.resolveRequest(reqId, 'allow');
+      syncPermissionsBadgeForActiveTab();
+    });
+  }
+
+  if (btnPromptDeny) {
+    btnPromptDeny.addEventListener('click', async () => {
+      if (!activePermissionRequest) return;
+      const reqId = activePermissionRequest.requestId;
+      activePermissionRequest = null;
+      if (permissionPrompt) permissionPrompt.style.display = 'none';
+      await api.permissions.resolveRequest(reqId, 'deny');
+      syncPermissionsBadgeForActiveTab();
+    });
+  }
+
+  if (api?.permissions?.onResolved) {
+    api.permissions.onResolved((data) => {
+      if (activePermissionRequest && activePermissionRequest.requestId === data.requestId) {
+        activePermissionRequest = null;
+        if (permissionPrompt) permissionPrompt.style.display = 'none';
+      }
+    });
+  }
+
+  if (api?.permissions?.onChanged) {
+    api.permissions.onChanged(() => {
+      syncPermissionsBadgeForActiveTab();
+      if (sitePermissionsPopover && sitePermissionsPopover.style.display === 'flex') {
+        renderSitePermissionsPopover();
+      }
+    });
+  }
+
   // --- Tab Rendering ---
   const renderTabs = (tabs) => {
     if (!Array.isArray(tabs)) return;
@@ -566,6 +779,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentActiveTabFavicon = tab.favicon || null;
         syncStarStateForUrl(tab.url);
         syncShieldForActiveTab(tab.url, tab.id);
+        syncPermissionsBadgeForActiveTab(tab.url);
       }
 
       const chip = document.createElement('div');
@@ -701,6 +915,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (workspacePopover) {
       workspacePopover.style.display = 'none';
       btnWorkspaceSelect?.classList.remove('open');
+    }
+    if (sitePermissionsPopover) {
+      sitePermissionsPopover.style.display = 'none';
     }
   };
 
@@ -1319,6 +1536,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       addressBar.setDisplayUrl(state.url);
       syncStarStateForUrl(state.url);
       syncShieldForActiveTab(state.url, currentActiveTabId);
+      syncPermissionsBadgeForActiveTab(state.url);
     }
 
     if (state.title) {

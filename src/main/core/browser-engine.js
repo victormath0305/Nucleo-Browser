@@ -96,6 +96,8 @@ class BrowserEngine {
             targetPath = AppConfig.paths.settingsHtml;
           } else if (host === 'downloads' || host === 'baixados') {
             targetPath = AppConfig.paths.downloadsHtml;
+          } else if (host === 'privacy' || host === 'privacidade' || host === 'permissions' || host === 'permissoes') {
+            targetPath = AppConfig.paths.privacyHtml;
           } else if (host === 'newtab') {
             targetPath = AppConfig.paths.newTabHtml;
           } else {

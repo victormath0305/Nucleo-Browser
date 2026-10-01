@@ -1,6 +1,6 @@
-# Núcleo Browser (v0.8.0)
+# Núcleo Browser (v0.9.0)
 
-> Navegador desktop moderno, rápido e seguro baseado em **Chromium** e **Electron** para Windows, desenvolvido com arquitetura modular desacoplada, Gerenciador Nativo de Downloads com controle de ciclo de vida e velocidade/ETA, Workspaces e contextos de abas sem recarregamento, bloqueador nativo de anúncios (Núcleo Shield), suporte a extensões Chromium (MV2/MV3) e central de configurações avançada.
+> Navegador desktop moderno, rápido e seguro baseado em **Chromium** e **Electron** para Windows, desenvolvido com arquitetura modular desacoplada, Permissões por Site & Central de Privacidade (`nucleo://privacy`), Gerenciador Nativo de Downloads com controle de ciclo de vida e velocidade/ETA, Workspaces e contextos de abas sem recarregamento, bloqueador nativo de anúncios (Núcleo Shield), suporte a extensões Chromium (MV2/MV3) e central de configurações avançada.
 
 ---
 
@@ -8,7 +8,10 @@
 
 O **Núcleo Browser** é um navegador desktop real desenvolvido para o sistema operacional Windows. Seu objetivo principal é fornecer uma experiência de navegação veloz, privada e altamente customizável, combinando o poder do motor **Chromium** com subsistemas nativos desenvolvidos do zero de forma modular.
 
-### Destaques Técnicos da Versão Atual (v0.8.0)
+### Destaques Técnicos da Versão Atual (v0.9.0)
+* **Permissões por Site & Central de Privacidade (`nucleo://privacy`)**: Subsistema granular para gerenciar o acesso de cada origem web a recursos sensíveis (`camera`, `microphone`, `geolocation`, `notifications`, `clipboard`, `fullscreen`, `midi`, `sensors`, `pointerLock`, `usb`, `serial`, `bluetooth`).
+* **Normalização Estrita de Origem & Proteção Anti-Spoofing**: Identificação inviolável baseada em `scheme + hostname + port` com descarte estrito de caminhos e query strings. Rejeição total de esquemas pseudo/opacos (`javascript:`, `data:`, `about:`).
+* **Prompt Interativo & Popover no Omnibox**: Banner dinâmico deslizante (`#permissionPrompt`) para autorização em tempo real e popover rápido acionado pelo badge de segurança (`#securityBadge`) na Omnibox com indicação visual de permissões ativas.
 * **Gerenciador Nativo de Downloads (`nucleo://downloads`)**: Subsistema completo de captura de downloads Chromium com cálculo de velocidade média em tempo real (EMA), estimativa de tempo restante (ETA), pausa/retomada/cancelamento, abertura direta e revelação segura no Explorer (`shell.showItemInFolder`).
 * **Segurança de Sistema de Arquivos nos Downloads**: Sanitização estrita contra ataques de travessia de diretório (`path traversal`), caracteres proibidos no Windows (`< > : " / \ | ? *`), nomes reservados de dispositivos (`CON`, `PRN`, `AUX`, `NUL`), e resolução automática de duplicatas (`arquivo (1).ext`).
 * **Workspaces & Gestão de Contextos de Abas**: Contextos independentes de abas (ex: Pessoal, Trabalho, Estudos) dentro de uma única janela principal com alternância instantânea sem recarregamento de páginas (`WebContentsView.setVisible`).
@@ -19,7 +22,7 @@ O **Núcleo Browser** é um navegador desktop real desenvolvido para o sistema o
 * **Suporte Real a Extensões Chromium**: Carregamento nativo via API de Sessão do Chromium/Electron com suporte a Manifest V3 (Service Workers) e Manifest V2, isolamento local de pastas e popups nativos.
 * **Núcleo Shield (Ad & Tracker Blocker)**: Bloqueio nativo antes do envio à rede via `session.webRequest.onBeforeRequest`, com regras estilo Adblock Plus, decisão $O(1)$ com LRU Cache e whitelist de exceções.
 * **Sistema Multi-Abas com `WebContentsView`**: Cada aba é um processo renderizador independente e isolado, garantindo alta performance, estabilidade e ausência de vazamento de memória.
-* **Favoritos, Histórico, Workspaces & Downloads Persistentes**: Estruturas hierárquicas e relacionais, gravação atômica serializada em disco com recuperação automática contra corrupção.
+* **Favoritos, Histórico, Workspaces, Downloads & Permissões Persistentes**: Estruturas hierárquicas e relacionais, gravação atômica serializada em disco com recuperação automática contra corrupção.
 * **Segurança de Nível Bancário**: `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`, isolamento de esquemas privilegiados e sanitização defensiva contra injeções.
 
 ---
@@ -292,11 +295,11 @@ npx electron .
 ```
 
 ### 3. Executar a Suíte Completa de Testes Automatizados
-O Núcleo Browser inclui **7 suítes de testes unitários** e **14 testes de integração automatizados** executados diretamente com uma instância real do Electron:
+O Núcleo Browser inclui **10 suítes de testes unitários** e **17 testes de integração automatizados** executados diretamente com uma instância real do Electron:
 ```bash
 npm test
 ```
-*Valida resolução de URLs, favoritos, histórico, persistência atômica, regras do Núcleo Shield, ciclo de vida de extensões Chromium (MV2/MV3), central de configurações, buscador dinâmico e exclusão de histórico de páginas internas com 100% de aprovação.*
+*Valida resolução de URLs, favoritos, histórico, persistência atômica, regras do Núcleo Shield, ciclo de vida de extensões Chromium (MV2/MV3), central de configurações, buscador dinâmico, workspaces, downloads nativos, permissões por site & privacidade com 100% de aprovação.*
 
 ### 4. Gerar o Executável Windows (Build)
 Para gerar a versão compilada e descompactada para Windows:
@@ -330,7 +333,7 @@ npm run dist:run
 
 O instalador gerado estará localizado em:
 ```text
-dist/Núcleo Browser Setup 0.7.0.exe
+dist/Núcleo Browser Setup 0.9.0.exe
 ```
 
 ---
@@ -344,8 +347,9 @@ dist/Núcleo Browser Setup 0.7.0.exe
 - [x] **v0.5.0**: Sistema de Extensões Chromium reais (Manifest V2 e V3) e isolamento local.
 - [x] **v0.6.0**: Central de Configurações (`nucleo://settings`), Provedores de Busca, Navegador Padrão e Temas.
 - [x] **v0.7.0**: Workspaces para organização de tarefas e contextos de abas sem recarregamento.
-- [ ] **v0.8.0**: Downloads Manager com painel visual flutuante e controle de velocidade.
-- [ ] **v0.9.0**: Inteligência Artificial contextual integrada ao navegador.
+- [x] **v0.8.0**: Downloads Manager nativo com controle de ciclo de vida e velocidade/ETA.
+- [x] **v0.9.0**: Permissões por Site & Central de Privacidade (`nucleo://privacy`), prompts interativos e proteção de hardware.
+- [ ] **v0.10.0**: Inteligência Artificial contextual integrada ao navegador.
 
 ---
 

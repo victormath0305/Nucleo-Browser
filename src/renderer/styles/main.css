@@ -1701,5 +1701,242 @@ body {
   width: 100%;
 }
 
+/* ==========================================================================
+   Site Permissions Popover & Permission Request Prompt (v0.9.0)
+   ========================================================================== */
+
+.security-badge {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+  transition: background var(--trans-fast), color var(--trans-fast);
+}
+
+.security-badge:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.security-badge.has-custom-permissions {
+  color: var(--accent-cyan);
+}
+
+/* Site Permissions Popover */
+.site-permissions-popover {
+  position: absolute;
+  top: 74px;
+  left: 36px;
+  width: 320px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: fadeInDown 0.15s ease-out;
+}
+
+.site-perm-header {
+  padding: 14px 16px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.site-perm-origin-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.site-perm-origin {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.site-perm-security {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.site-perm-security.secure {
+  color: #4caf50;
+}
+
+.site-perm-security.insecure {
+  color: #ff9800;
+}
+
+.site-perm-list {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.site-perm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.site-perm-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.site-perm-label-wrap svg {
+  width: 14px;
+  height: 14px;
+  color: var(--accent-cyan);
+}
+
+.site-perm-label {
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.site-perm-select {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  padding: 3px 6px;
+  outline: none;
+  cursor: pointer;
+}
+
+.site-perm-select:focus {
+  border-color: var(--accent-cyan);
+}
+
+.site-perm-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-subtle);
+  gap: 8px;
+}
+
+.site-perm-footer-btn {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  padding: 5px 9px;
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.site-perm-footer-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+.site-perm-footer-btn.primary {
+  background: rgba(0, 229, 255, 0.1);
+  color: var(--accent-cyan);
+  border-color: rgba(0, 229, 255, 0.3);
+}
+
+.site-perm-footer-btn.primary:hover {
+  background: rgba(0, 229, 255, 0.2);
+}
+
+/* Permission Request Interactive Prompt */
+.permission-prompt {
+  position: absolute;
+  top: 76px;
+  left: 60px;
+  width: 380px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent-cyan);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 12px var(--accent-cyan-glow);
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 14px;
+  animation: fadeInDown 0.18s ease-out;
+}
+
+.perm-prompt-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.perm-prompt-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: rgba(0, 229, 255, 0.12);
+  color: var(--accent-cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.perm-prompt-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+
+.perm-prompt-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-prompt-deny {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.btn-prompt-deny:hover {
+  background: rgba(244, 67, 54, 0.15);
+  color: #ff6b6b;
+  border-color: rgba(244, 67, 54, 0.4);
+}
+
+.btn-prompt-allow {
+  background: var(--accent-cyan);
+  border: 1px solid var(--accent-cyan);
+  border-radius: var(--radius-md);
+  color: #000;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.btn-prompt-allow:hover {
+  background: #26f7ff;
+  box-shadow: 0 0 10px var(--accent-cyan-glow);
+}
+
 
 

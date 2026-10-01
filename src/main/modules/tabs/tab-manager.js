@@ -170,6 +170,14 @@ class TabManager extends EventEmitter {
     if (trimmed === 'nucleo://downloads' || trimmed === 'nucleo://baixados') {
       return 'nucleo://downloads';
     }
+    if (
+      trimmed === 'nucleo://privacy' ||
+      trimmed === 'nucleo://privacidade' ||
+      trimmed === 'nucleo://permissions' ||
+      trimmed === 'nucleo://permissoes'
+    ) {
+      return 'nucleo://privacy';
+    }
 
     if (/^nucleo:\/\//i.test(trimmed)) {
       return trimmed;

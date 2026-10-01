@@ -78,6 +78,15 @@ class NavigationController {
       return 'nucleo://downloads';
     }
 
+    if (
+      trimmed === 'nucleo://privacy' ||
+      trimmed === 'nucleo://privacidade' ||
+      trimmed === 'nucleo://permissions' ||
+      trimmed === 'nucleo://permissoes'
+    ) {
+      return 'nucleo://privacy';
+    }
+
     // Explicit nucleo:// protocol
     if (/^nucleo:\/\//i.test(trimmed)) {
       return trimmed;

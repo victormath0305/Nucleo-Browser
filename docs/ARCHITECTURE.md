@@ -1,6 +1,6 @@
-# Arquitetura Técnica — Núcleo Browser (v0.8.0 — Download Manager Nativo)
+# Arquitetura Técnica — Núcleo Browser (v0.9.0 — Permissões por Site & Central de Privacidade)
 
-Este documento descreve a fundamentação de engenharia, a seleção de tecnologias, a arquitetura de processos, o sistema completo de abas, os subsistemas de Workspaces, o subsistema de Download Manager nativo, favoritos, histórico, Núcleo Shield, Sistema de Extensões Chromium (MV3 & MV2), a Central de Configurações persistente, Provedores de Busca, detecção de Navegador Padrão Windows, a estratégia de persistência local atômica serializada, os padrões de segurança e a modularidade do **Núcleo Browser**.
+Este documento descreve a fundamentação de engenharia, a seleção de tecnologias, a arquitetura de processos, o sistema completo de abas, os subsistemas de Workspaces, o subsistema de Download Manager nativo, o Subsistema de Permissões por Origem e Central de Privacidade, favoritos, histórico, Núcleo Shield, Sistema de Extensões Chromium (MV3 & MV2), a Central de Configurações persistente, Provedores de Busca, detecção de Navegador Padrão Windows, a estratégia de persistência local atômica serializada, os padrões de segurança e a modularidade do **Núcleo Browser**.
 
 ---
 
@@ -456,20 +456,73 @@ Localizado em `src/main/modules/downloads/`:
 
 ---
 
-## 15. Estrutura Modular de Diretórios
+## 15. Subsistema de Permissões por Origem & Central de Privacidade (`PermissionsManager`, `PermissionsStore`, `PermissionModel` e `PermissionsUtils`)
+
+Localizado em `src/main/modules/permissions/`:
+
+### 15.1. Normalização de Origem Estrita & Garantias Anti-Spoofing
+* **Identificação Inviolável da Origem**:
+  * Uma origem web é formalmente composta por `scheme + host + optional non-standard port` (ex.: `https://example.com:8443`, `http://localhost:3000`).
+  * Caminhos, subdiretórios, query strings (`?param=1`) e fragmentos hash (`#section`) são estritamente descartados.
+  * O navegador nunca utiliza `document.title`, favicons ou rótulos visuais para concessão ou verificação de permissões, eliminando qualquer vetor de spoofing.
+  * Esquemas pseudo e opacos (`javascript:`, `data:`, `about:`, `blob:`) são rejeitados retornando `null`.
+
+### 15.2. Permissões Suportadas & Racional Técnico de Limitações Chromium
+* **Recursos Suportados Granularmente**:
+  * `camera` e `microphone`: Dispositivos de captura de áudio e vídeo via `navigator.mediaDevices`.
+  * `geolocation`: Posicionamento geográfico preciso.
+  * `notifications`: Notificações de desktop do sistema operacional.
+  * `clipboard`: Leitura e escrita de área de transferência.
+  * `fullscreen`: Visualização de mídia e canvas em tela cheia.
+  * `midi`: Comunicação com dispositivos e instrumentos musicais MIDI.
+  * `sensors`: Acelerômetro, giroscópio e sensores ambientais.
+  * `pointerLock`: Bloqueio e captura de cursor para jogos e visualizações 3D.
+  * `usb`, `serial`, `bluetooth`: Dispositivos de hardware físico via WebUSB, WebSerial e WebBluetooth.
+* **Recursos Não Suportados Granularmente via PermissionRequestHandler**:
+  * `autoplay`: Controlado em nível de motor pelo Chromium Autoplay Policy flags e gestos de interação humana ativa (`User Gesture Activation`), não por manipulador de permissão de sessão.
+  * `drm`: Controlado por componentes Widevine CDM do Chromium compilados na engine.
+  * `webRtcIdentity`: API obsoleta e depreciada no padrão Chromium moderno.
+
+### 15.3. Modelo de Decisão em 3 Estados (`PermissionModel`)
+* **Estados Suportados**:
+  * `ask` (Padrão): Solicita confirmação explícita ao usuário no momento em que o site tenta acessar o recurso.
+  * `allow`: Concessão persistente; requisições subsequentes do mesmo origin são aprovadas imediatamente sem prompt.
+  * `deny`: Bloqueio explícito e persistente; requisições são rejeitadas silenciosa e instantaneamente.
+* **Escopo Global de Perfil**: As permissões concedidas a uma origem são vinculadas ao perfil de navegação e persistem transversalmente a todos os Workspaces, garantindo coerência de segurança.
+
+### 15.4. Persistência Atômica Serializada (`PermissionsStore`)
+* Localizado em `app.getPath('userData')/permissions.json`.
+* **Gravação Atômica via NTFS**: Grava em arquivo `.tmp.<timestamp>.<rand>` e renomeia via `fs.promises.rename` com fallback seguro para Windows.
+* **Fila Serializada com Promise**: Fila de escrita concorrente que previne locks `EBUSY`.
+* **Auto-Recuperação de Corrupção**: Arquivos corrompidos no disco geram backup `.corrupted.<timestamp>` e restauram estado limpo de segurança.
+
+### 15.5. Central de Privacidade (`nucleo://privacy`) e Top Chrome UI
+* **Dashboard Obsidian Dark**: Localizado em `src/renderer/privacy.html`, com estatísticas em tempo real, barra de busca por domínio, seletores `allow / deny / ask` por site, remoção de overrides e modal de redefinição completa.
+* **Popover de Permissões Rápidas no Omnibox**: Clicar no `#securityBadge` no Top Chrome abre o popover de permissões do site atualmente em foco, permitindo ajuste instantâneo e indicando visualmente quando o site possui permissões ativas (`.has-custom-permissions`).
+* **Prompt Dinâmico de Solicitação (`#permissionPrompt`)**: Banner interativo que desliza suavemente no topo da viewport quando um site em primeiro plano solicita acesso, com botões "Permitir" e "Bloquear".
+
+---
+
+## 16. Estrutura Modular de Diretórios
 
 ```text
 src/
 ├── main/
 │   ├── config/
-│   │   └── app-config.js                # Configurações globais, versão (0.8.0) e caminhos
+│   │   └── app-config.js                # Configurações globais, versão (0.9.0) e caminhos
 │   ├── core/
 │   │   ├── browser-engine.js            # Inicialização do Chromium, sessões e protocolo nucleo://
 │   │   └── browser-window.js            # Janela frameless e cálculo de bounds dinâmicos
 │   ├── ipc/
-│   │   ├── ipc-channels.js              # Canais e eventos IPC (Settings, Search, Workspaces, Downloads, Shield, Extensões)
+│   │   ├── ipc-channels.js              # Canais e eventos IPC (Settings, Search, Workspaces, Downloads, Permissions, Shield)
 │   │   └── ipc-handlers.js              # Registro e delegação de comandos IPC seguros
 │   ├── modules/
+│   │   ├── permissions/                 # Subsistema de Permissões por Origem & Privacidade
+│   │   │   ├── permissions-utils.js     # Normalização de origem, anti-spoofing, mapping e constantes
+│   │   │   ├── permissions-model.js     # Modelo de 3 estados por origem (allow, deny, ask)
+│   │   │   ├── permissions-store.js     # Persistência atômica serializada (permissions.json)
+│   │   │   ├── permissions-manager.js   # Interceptação de sessão, checks síncronos e prompts
+│   │   │   └── index.js                 # Exportações do módulo Permissions
 │   │   ├── downloads/                   # Subsistema Nativo de Gerenciamento de Downloads
 │   │   │   ├── downloads-utils.js       # Sanitização de caminhos, cálculo de EMA, ETA e formatos
 │   │   │   ├── downloads-model.js       # Modelo formal de ciclo de vida e estados de download
@@ -526,12 +579,13 @@ src/
 │   │       └── tab-manager.js
 │   └── app.js                           # Orquestração do ciclo de vida e instanciação
 ├── preload/
-│   └── index.js                         # ContextBridge seguro (nucleoAPI.downloads, settings, search, etc.)
+│   └── index.js                         # ContextBridge seguro (nucleoAPI.permissions, downloads, settings, etc.)
 └── renderer/
     ├── bookmarks.html                   # Interface do Gerenciador de Favoritos
     ├── history.html                     # Interface do Histórico de Navegação
     ├── downloads.html                   # Interface Nativa do Gerenciador de Downloads
-    ├── index.html                       # Top chrome do navegador (abas, omnibox, downloads, shield, extensões)
+    ├── privacy.html                     # Central de Privacidade & Permissões (nucleo://privacy)
+    ├── index.html                       # Top chrome do navegador (abas, omnibox, permissões, downloads, shield)
     ├── newtab.html                      # Página de Nova Aba com Acesso Rápido
     ├── shield.html                      # Dashboard de controle e estatísticas do Núcleo Shield
     ├── shield-test.html                 # Fixture de validação e testes determinísticos offline do Shield
@@ -540,8 +594,8 @@ src/
     ├── settings.html                    # Central de Configurações Obsidian do Núcleo Browser
     ├── scripts/
     │   ├── address-bar.js               # Lógica de digitação e formatação de URLs
-    │   └── ui-controller.js             # Controle da UI, popovers, downloads badge, temas e abas
+    │   └── ui-controller.js             # Controle da UI, popovers, prompt de permissão, downloads badge e abas
     └── styles/
-        ├── main.css                     # Estilos principais, badges e popovers
+        ├── main.css                     # Estilos principais, badges, prompt de permissões e popovers
         └── theme.css                    # Variáveis e design tokens (Dark/Light + 5 cores de acento)
 ```

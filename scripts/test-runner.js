@@ -17,9 +17,10 @@ const { SearchProvider, BUILTIN_SEARCH_ENGINES } = require('../src/main/modules/
 const { DefaultBrowserManager } = require('../src/main/modules/default-browser');
 const { WorkspaceModel, WorkspaceStore, WorkspaceManager } = require('../src/main/modules/workspaces');
 const { DownloadsUtils, DownloadModel, DownloadsStore, DownloadsManager } = require('../src/main/modules/downloads');
+const { PermissionsUtils, PermissionModel, PermissionsStore, PermissionsManager } = require('../src/main/modules/permissions');
 
 async function runUnitTests() {
-  console.log('=== [1/2] Executing Unit Tests (v0.8.0 Downloads, Workspaces, Settings, Extensions, Shield, Bookmarks & History) ===\n');
+  console.log('=== [1/2] Executing Unit Tests (v0.9.0 Permissions, Downloads, Workspaces, Settings, Extensions, Shield, Bookmarks & History) ===\n');
 
   // --- 1. Navigation Resolution Tests ---
   console.log('[Suite 1: Navigation Controller]');
@@ -913,6 +914,164 @@ async function runUnitTests() {
   console.assert(navDownloads.resolveInputToUrl('nucleo://baixados') === 'nucleo://downloads', 'nucleo://baixados resolution failed');
   console.log('  ✔ NavigationController nucleo://downloads & nucleo://baixados resolution verified');
 
+  // --- 10. Site Permissions & Privacy Subsystem Tests ---
+  console.log('\n[Suite 10: Site Permissions & Privacy Subsystem]');
+  const tempPermsPath = path.join(os.tmpdir(), `nucleo-test-perms-${Date.now()}.json`);
+
+  // Test 10.1: PermissionsUtils origin normalization (strict security & anti-spoofing)
+  console.assert(PermissionsUtils.normalizeOrigin('https://example.com/some/path?query=1#hash') === 'https://example.com', 'Origin normalization should strip paths and queries');
+  console.assert(PermissionsUtils.normalizeOrigin('https://sub.domain.org:8443/') === 'https://sub.domain.org:8443', 'Origin normalization must preserve non-standard ports');
+  console.assert(PermissionsUtils.normalizeOrigin('https://example.com:443/') === 'https://example.com', 'Standard HTTPS port 443 should be stripped');
+  console.assert(PermissionsUtils.normalizeOrigin('http://example.com:80/') === 'http://example.com', 'Standard HTTP port 80 should be stripped');
+  console.assert(PermissionsUtils.normalizeOrigin('http://example.com') !== PermissionsUtils.normalizeOrigin('https://example.com'), 'HTTP and HTTPS origins must never collide');
+  console.assert(PermissionsUtils.normalizeOrigin('javascript:alert(1)') === null, 'Pseudo schemes must return null');
+  console.assert(PermissionsUtils.normalizeOrigin('data:text/html,<h1>hi</h1>') === null, 'Data URLs must return null');
+  console.assert(PermissionsUtils.normalizeOrigin('about:blank') === null, 'About schemes must return null');
+  console.assert(PermissionsUtils.normalizeOrigin(null) === null, 'Null origin must return null');
+  console.assert(PermissionsUtils.normalizeOrigin('') === null, 'Empty string must return null');
+  console.log('  ✔ PermissionsUtils origin normalization & anti-spoofing verified');
+
+  // Test 10.2: PermissionsUtils permission mapping and metadata
+  console.assert(PermissionsUtils.mapPermissionType('media', { mediaTypes: ['video'] }).includes('camera'), 'Media video should map to camera');
+  console.assert(PermissionsUtils.mapPermissionType('media', { mediaTypes: ['audio'] }).includes('microphone'), 'Media audio should map to microphone');
+  console.assert(PermissionsUtils.mapPermissionType('geolocation').includes('geolocation'), 'Geolocation direct mapping');
+  console.assert(PermissionsUtils.mapPermissionType('notifications').includes('notifications'), 'Notifications direct mapping');
+  console.assert(PermissionsUtils.mapPermissionType('clipboard-read').includes('clipboard'), 'clipboard-read mapping');
+  console.assert(PermissionsUtils.mapPermissionType('unknown-perm').length === 0, 'Unknown permission should return empty array');
+  console.assert(PermissionsUtils.SUPPORTED_PERMISSIONS.includes('camera'), 'camera in SUPPORTED_PERMISSIONS');
+  console.assert(PermissionsUtils.PERMISSION_STATES.ALLOW === 'allow', 'PERMISSION_STATES.ALLOW verified');
+  console.assert(PermissionsUtils.PERMISSION_STATES.DENY === 'deny', 'PERMISSION_STATES.DENY verified');
+  console.assert(PermissionsUtils.PERMISSION_STATES.ASK === 'ask', 'PERMISSION_STATES.ASK verified');
+  console.assert(PermissionsUtils.UNSUPPORTED_PERMISSIONS.autoplay !== undefined, 'UNSUPPORTED_PERMISSIONS includes autoplay documentation');
+  console.log('  ✔ PermissionsUtils mapping, states & metadata verified');
+
+  // Test 10.3: PermissionsUtils secure context detection
+  console.assert(PermissionsUtils.isSecureContext('https://secure.example.com') === true, 'HTTPS must be secure');
+  console.assert(PermissionsUtils.isSecureContext('http://localhost:3000') === true, 'Localhost HTTP must be secure');
+  console.assert(PermissionsUtils.isSecureContext('http://127.0.0.1:8080') === true, '127.0.0.1 must be secure');
+  console.assert(PermissionsUtils.isSecureContext('http://insecure.example.com') === false, 'Remote HTTP must not be secure');
+  console.log('  ✔ Secure context detection verified');
+
+  // Test 10.4: PermissionModel origin handling and mutation
+  const model1 = new PermissionModel('https://meet.google.com');
+  console.assert(model1.origin === 'https://meet.google.com', 'Model origin assignment');
+  console.assert(model1.get('camera') === 'ask', 'Default permission state should be ask');
+  console.assert(model1.hasOverrides() === false, 'Initial model should have no overrides');
+  
+  model1.set('camera', 'allow');
+  model1.set('microphone', 'deny');
+  console.assert(model1.get('camera') === 'allow', 'Camera set allow failed');
+  console.assert(model1.get('microphone') === 'deny', 'Microphone set deny failed');
+  console.assert(model1.hasOverrides() === true, 'Model with overrides should return true');
+
+  model1.reset('camera');
+  console.assert(model1.get('camera') === 'ask', 'Reset permission should revert to ask');
+  model1.resetAll();
+  console.assert(model1.hasOverrides() === false, 'resetAll should clear all overrides');
+
+  const jsonDump = model1.toJSON();
+  console.assert(jsonDump.origin === 'https://meet.google.com', 'toJSON includes origin');
+  const restoredModel = PermissionModel.fromJSON({
+    origin: 'https://github.com',
+    permissions: { notifications: 'allow' },
+    createdAt: 1000,
+    updatedAt: 2000
+  });
+  console.assert(restoredModel.origin === 'https://github.com', 'fromJSON origin mismatch');
+  console.assert(restoredModel.get('notifications') === 'allow', 'fromJSON permission mismatch');
+  console.log('  ✔ PermissionModel mutation, reset and JSON serialization verified');
+
+  // Test 10.5: PermissionsStore atomic persistence & corruption recovery
+  const permsStore = new PermissionsStore(tempPermsPath);
+  const initialPerms = await permsStore.load();
+  console.assert(initialPerms instanceof Map && initialPerms.size === 0, 'Clean store should return empty Map');
+
+  const storeMap = new Map();
+  const testModel = new PermissionModel('https://example.com');
+  testModel.set('notifications', 'deny');
+  storeMap.set('https://example.com', testModel);
+  await permsStore.save(storeMap);
+
+  const reloadedStore = await permsStore.load();
+  console.assert(reloadedStore.has('https://example.com'), 'Store reload should contain saved origin');
+  console.assert(reloadedStore.get('https://example.com').get('notifications') === 'deny', 'Store reload permission mismatch');
+
+  // Simulate file corruption
+  fs.writeFileSync(tempPermsPath, '{{{ CORRUPT JSON DATA @@@ !!!');
+  const recoveredPerms = await permsStore.load();
+  console.assert(recoveredPerms instanceof Map && recoveredPerms.size === 0, 'Store corruption recovery should return empty map safely');
+  console.log('  ✔ PermissionsStore atomic serialization and corruption recovery verified');
+
+  // Test 10.6: PermissionsManager full lifecycle & operations
+  const permsManager = new PermissionsManager(permsStore);
+  await permsManager.initialize();
+
+  // Initially empty
+  console.assert(permsManager.listPermissions().length === 0, 'Initially should have 0 configured origins');
+
+  // Setting permissions
+  await permsManager.setPermission('https://zoom.us', 'camera', 'allow');
+  await permsManager.setPermission('https://zoom.us', 'microphone', 'allow');
+  const zoomPerms = permsManager.getPermissionsForOrigin('https://zoom.us');
+  console.assert(zoomPerms.camera === 'allow', 'Manager setPermission camera failed');
+  console.assert(zoomPerms.microphone === 'allow', 'Manager setPermission microphone failed');
+  console.assert(permsManager.listPermissions().length === 1, 'listPermissions should show 1 origin');
+
+  // Resetting specific permission
+  await permsManager.resetPermission('https://zoom.us', 'camera');
+  console.assert(permsManager.getPermissionsForOrigin('https://zoom.us').camera === 'ask', 'Camera reset failed');
+  console.assert(permsManager.getPermissionsForOrigin('https://zoom.us').microphone === 'allow', 'Microphone should remain allow');
+
+  // Reset origin
+  await permsManager.resetOrigin('https://zoom.us');
+  console.assert(permsManager.listPermissions().length === 0, 'Origin should be removed when all reset');
+
+  // Multiple origins & resetAll
+  await permsManager.setPermission('https://site-a.com', 'geolocation', 'deny');
+  await permsManager.setPermission('https://site-b.com', 'notifications', 'allow');
+  console.assert(permsManager.listPermissions().length === 2, 'Should have 2 origins configured');
+  await permsManager.resetAll();
+  console.assert(permsManager.listPermissions().length === 0, 'resetAll should clear all origins');
+  console.log('  ✔ PermissionsManager CRUD operations, querying and reset verified');
+
+  // Test 10.7: PermissionsManager interactive request simulation & check handlers
+  let promptEmitted = null;
+  permsManager.on('permission-prompt', (prompt) => {
+    promptEmitted = prompt;
+  });
+
+  // Test check handler (unconfigured origin returns false for allow)
+  const isAllowedInitial = permsManager._handlePermissionCheck(null, 'camera', 'https://telecom.com');
+  console.assert(isAllowedInitial === false, 'Initial unconfigured permission check should return false');
+
+  // Simulate request from session
+  let requestResolved = null;
+  const mockCallback = (result) => { requestResolved = result; };
+
+  permsManager._handlePermissionRequest(null, 'camera', mockCallback, { requestingUrl: 'https://telecom.com' });
+  console.assert(promptEmitted !== null, 'permission-prompt event should have fired');
+  console.assert(promptEmitted.origin === 'https://telecom.com', 'Prompt origin mismatch');
+  console.assert(promptEmitted.permission === 'camera', 'Prompt permission mismatch');
+  console.assert(promptEmitted.requestId !== undefined, 'Prompt requestId missing');
+
+  // Resolve request with allow
+  const resolveSuccess = await permsManager.resolveRequest(promptEmitted.requestId, 'allow');
+  console.assert(resolveSuccess === true, 'resolveRequest should succeed');
+  console.assert(requestResolved === true, 'Callback should be called with true for allow');
+
+  // Now permission check should return true
+  const isAllowedNow = permsManager._handlePermissionCheck(null, 'camera', 'https://telecom.com');
+  console.assert(isAllowedNow === true, 'Permission check should return true after allow');
+  console.log('  ✔ PermissionsManager interactive request handling, prompts & resolution verified');
+
+  // Test 10.8: NavigationController nucleo://privacy & aliases resolution
+  const navPrivacy = new NavigationController(null);
+  console.assert(navPrivacy.resolveInputToUrl('nucleo://privacy') === 'nucleo://privacy', 'nucleo://privacy resolution failed');
+  console.assert(navPrivacy.resolveInputToUrl('nucleo://privacidade') === 'nucleo://privacy', 'nucleo://privacidade resolution failed');
+  console.assert(navPrivacy.resolveInputToUrl('nucleo://permissions') === 'nucleo://privacy', 'nucleo://permissions resolution failed');
+  console.assert(navPrivacy.resolveInputToUrl('nucleo://permissoes') === 'nucleo://privacy', 'nucleo://permissoes resolution failed');
+  console.log('  ✔ NavigationController nucleo://privacy & aliases resolution verified');
+
   // Cleanup temp files
   try {
     if (fs.existsSync(tempBmPath)) fs.unlinkSync(tempBmPath);
@@ -922,6 +1081,7 @@ async function runUnitTests() {
     if (fs.existsSync(tempSettingsPath)) fs.unlinkSync(tempSettingsPath);
     if (fs.existsSync(tempWsPath)) fs.unlinkSync(tempWsPath);
     if (fs.existsSync(tempDlPath)) fs.unlinkSync(tempDlPath);
+    if (fs.existsSync(tempPermsPath)) fs.unlinkSync(tempPermsPath);
     if (fs.existsSync(tempDlDir)) await fs.promises.rm(tempDlDir, { recursive: true, force: true });
     if (fs.existsSync(tempExtDir)) await fs.promises.rm(tempExtDir, { recursive: true, force: true });
   } catch {}
@@ -965,7 +1125,7 @@ async function main() {
     }
     await runIntegrationTest();
     console.log('\n=============================================');
-    console.log('  ALL NÚCLEO BROWSER v0.8.0 TESTS PASSED (100%)');
+    console.log('  ALL NÚCLEO BROWSER v0.9.0 TESTS PASSED (100%)');
     console.log('=============================================\n');
     process.exit(0);
   } catch (err) {

@@ -23,7 +23,8 @@ class IpcHandlerRegistry {
     defaultBrowserManager = null,
     browserEngine = null,
     workspaceManager = null,
-    downloadsManager = null
+    downloadsManager = null,
+    permissionsManager = null
   }) {
     this.windowController = windowController;
     this.tabManager = tabManager;
@@ -39,6 +40,7 @@ class IpcHandlerRegistry {
     this.browserEngine = browserEngine;
     this.workspaceManager = workspaceManager;
     this.downloadsManager = downloadsManager;
+    this.permissionsManager = permissionsManager;
   }
 
   registerAll() {
@@ -57,6 +59,7 @@ class IpcHandlerRegistry {
     this._registerSystemHandlers();
     this._registerWorkspaceHandlers();
     this._registerDownloadHandlers();
+    this._registerPermissionHandlers();
     this._forwardTabEventsToRenderer();
     this._forwardDataEventsToRenderer();
   }
@@ -631,6 +634,20 @@ class IpcHandlerRegistry {
         broadcastEvent(IPC_CHANNELS.EVENT_DOWNLOADS_CLEARED);
       });
     }
+
+    if (this.permissionsManager) {
+      this.permissionsManager.on('permission-changed', (data) => {
+        broadcastEvent(IPC_CHANNELS.EVENT_PERMISSIONS_CHANGED, data);
+      });
+
+      this.permissionsManager.on('permission-request', (data) => {
+        broadcastEvent(IPC_CHANNELS.EVENT_PERMISSIONS_REQUEST, data);
+      });
+
+      this.permissionsManager.on('permission-resolved', (data) => {
+        broadcastEvent(IPC_CHANNELS.EVENT_PERMISSIONS_RESOLVED, data);
+      });
+    }
   }
 
   _validateInternalSender(event) {
@@ -790,6 +807,50 @@ class IpcHandlerRegistry {
     ipcMain.handle(IPC_CHANNELS.DOWNLOADS_GET_ACTIVE_COUNT, (event) => {
       this._validateInternalSender(event);
       return this.downloadsManager.getActiveCount();
+    });
+  }
+
+  _registerPermissionHandlers() {
+    if (!this.permissionsManager) return;
+
+    ipcMain.handle(IPC_CHANNELS.PERMISSIONS_LIST, (event) => {
+      this._validateInternalSender(event);
+      return this.permissionsManager.listPermissions();
+    });
+
+    ipcMain.handle(IPC_CHANNELS.PERMISSIONS_GET_FOR_ORIGIN, (event, origin) => {
+      this._validateInternalSender(event);
+      return this.permissionsManager.getPermissionsForOrigin(origin);
+    });
+
+    ipcMain.handle(IPC_CHANNELS.PERMISSIONS_SET, async (event, { origin, permission, state }) => {
+      this._validateInternalSender(event);
+      await this.permissionsManager.setPermission(origin, permission, state);
+      return { success: true };
+    });
+
+    ipcMain.handle(IPC_CHANNELS.PERMISSIONS_RESET, async (event, { origin, permission }) => {
+      this._validateInternalSender(event);
+      await this.permissionsManager.resetPermission(origin, permission);
+      return { success: true };
+    });
+
+    ipcMain.handle(IPC_CHANNELS.PERMISSIONS_RESET_ORIGIN, async (event, origin) => {
+      this._validateInternalSender(event);
+      await this.permissionsManager.resetOrigin(origin);
+      return { success: true };
+    });
+
+    ipcMain.handle(IPC_CHANNELS.PERMISSIONS_RESET_ALL, async (event) => {
+      this._validateInternalSender(event);
+      await this.permissionsManager.resetAll();
+      return { success: true };
+    });
+
+    ipcMain.handle(IPC_CHANNELS.PERMISSIONS_RESOLVE_REQUEST, async (event, { requestId, decision, persist }) => {
+      this._validateInternalSender(event);
+      const success = await this.permissionsManager.resolveRequest(requestId, decision, persist !== false);
+      return { success };
     });
   }
 }

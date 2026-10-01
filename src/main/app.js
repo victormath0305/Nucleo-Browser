@@ -19,6 +19,7 @@ const { SearchProvider } = require('./modules/search');
 const { DefaultBrowserManager } = require('./modules/default-browser');
 const { WorkspaceManager } = require('./modules/workspaces');
 const { DownloadsManager } = require('./modules/downloads');
+const { PermissionsManager } = require('./modules/permissions');
 const IpcHandlerRegistry = require('./ipc/ipc-handlers');
 const path = require('path');
 
@@ -34,6 +35,9 @@ class NucleoApplication {
     this.settingsManager = new SettingsManager();
     this.downloadsManager = new DownloadsManager({
       settingsManager: this.settingsManager,
+      windowController: this.windowController
+    });
+    this.permissionsManager = new PermissionsManager({
       windowController: this.windowController
     });
     this.searchProvider = new SearchProvider(this.settingsManager);
@@ -67,7 +71,7 @@ class NucleoApplication {
     // 1. Initialize Chromium Engine, Session Policies, and Internal Protocol
     await this.engine.initialize();
 
-    // 2. Initialize Settings, Workspaces, Bookmarks, History, Shield, Extensions and Downloads Subsystems
+    // 2. Initialize Settings, Workspaces, Bookmarks, History, Shield, Extensions, Downloads and Permissions Subsystems
     await this.settingsManager.initialize();
     await this.workspaceManager.initialize();
     await this.bookmarkManager.initialize();
@@ -75,6 +79,7 @@ class NucleoApplication {
     await this.shieldManager.initialize();
     await this.extensionManager.initialize();
     await this.downloadsManager.initialize();
+    await this.permissionsManager.initialize();
 
     // 3. Configure Download and Privacy Session Policies
     this._setupSessionPolicies();
@@ -91,6 +96,7 @@ class NucleoApplication {
     );
     this.windowController.setTabManager(this.tabManager);
     this.downloadsManager.tabManager = this.tabManager;
+    this.permissionsManager.tabManager = this.tabManager;
 
     // 5. Attach Shield Network Interceptor
     this.shieldManager.attachToSession(this.engine.getSession(), this.tabManager, this.windowController);
@@ -114,7 +120,8 @@ class NucleoApplication {
       defaultBrowserManager: this.defaultBrowserManager,
       browserEngine: this.engine,
       workspaceManager: this.workspaceManager,
-      downloadsManager: this.downloadsManager
+      downloadsManager: this.downloadsManager,
+      permissionsManager: this.permissionsManager
     });
     this.ipcRegistry.registerAll();
 
@@ -136,6 +143,9 @@ class NucleoApplication {
 
     // Attach Native Downloads Subsystem
     this.downloadsManager.attachToSession(session);
+
+    // Attach Native Permissions Subsystem
+    this.permissionsManager.attachToSession(session, this.windowController, this.tabManager);
 
     // Handle Do Not Track header injection
     session.webRequest.onBeforeSendHeaders((details, callback) => {

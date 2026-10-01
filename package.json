@@ -1,7 +1,7 @@
 {
   "name": "nucleo-browser",
   "productName": "Núcleo Browser",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Navegador desktop moderno, seguro e modular baseado em Chromium",
   "main": "src/main/index.js",
   "scripts": {
