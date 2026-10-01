@@ -711,6 +711,17 @@ class TabManager extends EventEmitter {
   }
 
   /**
+   * Sets the active tab view visibility.
+   * @param {boolean} visible
+   */
+  setActiveTabVisible(visible) {
+    const tab = this.getActiveTab();
+    if (tab) {
+      tab.setVisible(Boolean(visible));
+    }
+  }
+
+  /**
    * Gets a specific tab by ID.
    * @param {string} tabId
    * @returns {Tab|null}

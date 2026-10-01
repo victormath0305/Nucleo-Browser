@@ -18,6 +18,8 @@ const { DefaultBrowserManager } = require('../src/main/modules/default-browser')
 const { WorkspaceModel, WorkspaceStore, WorkspaceManager } = require('../src/main/modules/workspaces');
 const { DownloadsUtils, DownloadModel, DownloadsStore, DownloadsManager } = require('../src/main/modules/downloads');
 const { PermissionsUtils, PermissionModel, PermissionsStore, PermissionsManager } = require('../src/main/modules/permissions');
+const IPC_CHANNELS = require('../src/main/ipc/ipc-channels');
+const TabManager = require('../src/main/modules/tabs/tab-manager');
 
 async function runUnitTests() {
   console.log('=== [1/2] Executing Unit Tests (v0.9.0 Permissions, Downloads, Workspaces, Settings, Extensions, Shield, Bookmarks & History) ===\n');
@@ -1071,6 +1073,38 @@ async function runUnitTests() {
   console.assert(navPrivacy.resolveInputToUrl('nucleo://permissions') === 'nucleo://privacy', 'nucleo://permissions resolution failed');
   console.assert(navPrivacy.resolveInputToUrl('nucleo://permissoes') === 'nucleo://privacy', 'nucleo://permissoes resolution failed');
   console.log('  ✔ NavigationController nucleo://privacy & aliases resolution verified');
+
+  // --- 11. Native Menus & Overlays Subsystem Tests ---
+  console.log('\n[Suite 11: Native Menus & Overlays Subsystem]');
+  console.assert(IPC_CHANNELS.MENU_SHOW_MAIN === 'menu:show-main', 'MENU_SHOW_MAIN channel mismatch');
+  console.assert(IPC_CHANNELS.MENU_SHOW_EXTENSIONS === 'menu:show-extensions', 'MENU_SHOW_EXTENSIONS channel mismatch');
+  console.assert(IPC_CHANNELS.MENU_SHOW_TAB_CONTEXT === 'menu:show-tab-context', 'MENU_SHOW_TAB_CONTEXT channel mismatch');
+  console.assert(IPC_CHANNELS.MENU_SHOW_WORKSPACES_CONTEXT === 'menu:show-workspaces-context', 'MENU_SHOW_WORKSPACES_CONTEXT channel mismatch');
+  console.assert(IPC_CHANNELS.MENU_SHOW_SHIELD === 'menu:show-shield', 'MENU_SHOW_SHIELD channel mismatch');
+  console.assert(IPC_CHANNELS.MENU_SHOW_SITE_PERMISSIONS === 'menu:show-site-permissions', 'MENU_SHOW_SITE_PERMISSIONS channel mismatch');
+  console.assert(IPC_CHANNELS.MENU_SHOW_WORKSPACES === 'menu:show-workspaces', 'MENU_SHOW_WORKSPACES channel mismatch');
+  console.assert(IPC_CHANNELS.TAB_SET_ACTIVE_VISIBLE === 'tab:set-active-visible', 'TAB_SET_ACTIVE_VISIBLE channel mismatch');
+  console.assert(IPC_CHANNELS.EVENT_UI_ACTION === 'event:ui-action', 'EVENT_UI_ACTION channel mismatch');
+  console.log('  ✔ Native menu IPC channels defined and verified');
+
+  const preloadContent = fs.readFileSync(path.join(__dirname, '../src/preload/index.js'), 'utf-8');
+  console.assert(preloadContent.includes('openMainMenu:'), 'preload missing openMainMenu');
+  console.assert(preloadContent.includes('openExtensionsMenu:'), 'preload missing openExtensionsMenu');
+  console.assert(preloadContent.includes('openTabContextMenu:'), 'preload missing openTabContextMenu');
+  console.assert(preloadContent.includes('openWorkspacesContextMenu:'), 'preload missing openWorkspacesContextMenu');
+  console.assert(preloadContent.includes('openShieldMenu:'), 'preload missing openShieldMenu');
+  console.assert(preloadContent.includes('openSitePermissionsMenu:'), 'preload missing openSitePermissionsMenu');
+  console.assert(preloadContent.includes('openWorkspacesMenu:'), 'preload missing openWorkspacesMenu');
+  console.assert(preloadContent.includes('setActiveTabVisible:'), 'preload missing setActiveTabVisible');
+  console.assert(preloadContent.includes('onUIAction:'), 'preload missing onUIAction');
+  console.log('  ✔ Preload bridge exposes all native menu and visibility methods');
+
+  const mockWinCtrl = { getWindow: () => null, isBookmarksBarVisible: () => false };
+  const mockTabManager = new TabManager(mockWinCtrl);
+  console.assert(typeof mockTabManager.setActiveTabVisible === 'function', 'TabManager missing setActiveTabVisible method');
+  mockTabManager.setActiveTabVisible(false);
+  mockTabManager.setActiveTabVisible(true);
+  console.log('  ✔ TabManager setActiveTabVisible method verified');
 
   // Cleanup temp files
   try {

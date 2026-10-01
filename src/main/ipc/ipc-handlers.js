@@ -3,7 +3,7 @@
  * @module ipc/ipc-handlers
  */
 
-const { ipcMain, dialog } = require('electron');
+const { ipcMain, dialog, Menu } = require('electron');
 const IPC_CHANNELS = require('./ipc-channels');
 const AppConfig = require('../config/app-config');
 const ExtensionValidator = require('../modules/extensions/extension-validator');
@@ -60,6 +60,7 @@ class IpcHandlerRegistry {
     this._registerWorkspaceHandlers();
     this._registerDownloadHandlers();
     this._registerPermissionHandlers();
+    this._registerMenuHandlers();
     this._forwardTabEventsToRenderer();
     this._forwardDataEventsToRenderer();
   }
@@ -158,6 +159,11 @@ class IpcHandlerRegistry {
 
     ipcMain.handle(IPC_CHANNELS.TAB_GET_ALL, () => {
       return this.tabManager.getAllTabs();
+    });
+
+    ipcMain.handle(IPC_CHANNELS.TAB_SET_ACTIVE_VISIBLE, (event, visible) => {
+      this.tabManager.setActiveTabVisible(visible);
+      return { success: true };
     });
   }
 
@@ -851,6 +857,606 @@ class IpcHandlerRegistry {
       this._validateInternalSender(event);
       const success = await this.permissionsManager.resolveRequest(requestId, decision, persist !== false);
       return { success };
+    });
+  }
+
+  _registerMenuHandlers() {
+    // 1. Main Application Menu (3 Dots Menu)
+    ipcMain.handle(IPC_CHANNELS.MENU_SHOW_MAIN, async (event, { x, y } = {}) => {
+      this._validateInternalSender(event);
+      const isBookmarksBarVisible = this.windowController ? this.windowController.isBookmarksBarVisible() : false;
+
+      const template = [
+        {
+          label: 'Nova Aba',
+          accelerator: 'CmdOrCtrl+T',
+          click: () => this.tabManager.createTab()
+        },
+        {
+          label: 'Nova Janela',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => this.tabManager.createTab()
+        },
+        {
+          label: 'Fechar Aba',
+          accelerator: 'CmdOrCtrl+W',
+          click: () => {
+            const active = this.tabManager.getActiveTab();
+            if (active) this.tabManager.closeTab(active.id);
+          }
+        },
+        {
+          label: 'Recarregar',
+          accelerator: 'CmdOrCtrl+R',
+          click: () => {
+            const active = this.tabManager.getActiveTab();
+            if (active) active.reload();
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Favoritos',
+          accelerator: 'CmdOrCtrl+Shift+O',
+          click: () => this.tabManager.createTab('nucleo://bookmarks')
+        },
+        {
+          label: 'Barra de favoritos',
+          accelerator: 'CmdOrCtrl+Shift+B',
+          type: 'checkbox',
+          checked: isBookmarksBarVisible,
+          click: () => {
+            if (this.windowController) this.windowController.toggleBookmarksBar();
+          }
+        },
+        {
+          label: 'Histórico',
+          accelerator: 'CmdOrCtrl+H',
+          click: () => this.tabManager.createTab('nucleo://history')
+        },
+        {
+          label: 'Downloads',
+          accelerator: 'CmdOrCtrl+J',
+          click: () => this.tabManager.createTab('nucleo://downloads')
+        },
+        { type: 'separator' },
+        {
+          label: 'Núcleo Shield',
+          click: () => this.tabManager.createTab('nucleo://shield')
+        },
+        {
+          label: 'Extensões',
+          accelerator: 'CmdOrCtrl+Shift+E',
+          click: () => this.tabManager.createTab('nucleo://extensions')
+        },
+        {
+          label: 'Privacidade & Permissões',
+          click: () => this.tabManager.createTab('nucleo://privacy')
+        },
+        { type: 'separator' },
+        {
+          label: 'Inspecionar Página',
+          accelerator: 'F12',
+          click: () => {
+            const active = this.tabManager.getActiveTab();
+            if (active) active.toggleDevTools();
+          }
+        },
+        {
+          label: 'Inspecionar Navegador',
+          accelerator: 'CmdOrCtrl+Shift+I',
+          click: () => {
+            if (this.devToolsManager) this.devToolsManager.toggleUIDevTools();
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Configurações',
+          click: () => this.tabManager.createTab('nucleo://settings')
+        },
+        {
+          label: 'Sobre o Núcleo Browser',
+          click: () => this.tabManager.createTab('nucleo://settings')
+        },
+        { type: 'separator' },
+        {
+          label: 'Sair',
+          accelerator: 'CmdOrCtrl+Q',
+          role: 'quit'
+        }
+      ];
+
+      const menu = Menu.buildFromTemplate(template);
+      const win = this.windowController.getWindow();
+      if (win && !win.isDestroyed()) {
+        menu.popup({
+          window: win,
+          x: typeof x === 'number' ? Math.round(x) : undefined,
+          y: typeof y === 'number' ? Math.round(y) : undefined
+        });
+      }
+      return { success: true };
+    });
+
+    // 2. Extensions Menu (Puzzle piece)
+    ipcMain.handle(IPC_CHANNELS.MENU_SHOW_EXTENSIONS, async (event, { x, y } = {}) => {
+      this._validateInternalSender(event);
+      const extensions = this.extensionManager ? this.extensionManager.getAll() : [];
+      const template = [
+        {
+          label: 'Extensões',
+          enabled: false
+        },
+        { type: 'separator' }
+      ];
+
+      if (!extensions || extensions.length === 0) {
+        template.push({
+          label: 'Nenhuma extensão instalada',
+          enabled: false
+        });
+      } else {
+        for (const ext of extensions) {
+          const isEnabled = ext.enabled !== false;
+          const statusIcon = isEnabled ? '●' : '○';
+          const label = `${statusIcon} ${ext.name} (v${ext.version || '1.0'})`;
+
+          const extSubmenu = [];
+          if (ext.hasPopup) {
+            extSubmenu.push({
+              label: 'Abrir pop-up da extensão',
+              click: async () => {
+                await this.extensionManager.openPopup(ext.id, { x, y });
+              }
+            });
+          }
+          extSubmenu.push({
+            label: isEnabled ? 'Desativar extensão' : 'Ativar extensão',
+            click: async () => {
+              if (isEnabled) {
+                await this.extensionManager.disable(ext.id);
+              } else {
+                await this.extensionManager.enable(ext.id);
+              }
+            }
+          });
+          extSubmenu.push({
+            label: 'Gerenciar extensão',
+            click: () => {
+              this.tabManager.createTab('nucleo://extensions');
+            }
+          });
+          extSubmenu.push({ type: 'separator' });
+          extSubmenu.push({
+            label: 'Desinstalar extensão',
+            click: async () => {
+              await this.extensionManager.uninstall(ext.id);
+            }
+          });
+
+          template.push({
+            label,
+            submenu: extSubmenu,
+            click: ext.hasPopup ? async () => {
+              await this.extensionManager.openPopup(ext.id, { x, y });
+            } : () => {
+              this.tabManager.createTab('nucleo://extensions');
+            }
+          });
+        }
+      }
+
+      template.push({ type: 'separator' });
+      template.push({
+        label: '➕ Instalar extensão (.crx ou pasta)...',
+        click: async () => {
+          await this.extensionManager.selectAndInstall();
+        }
+      });
+      template.push({
+        label: '⚙️ Gerenciar extensões',
+        accelerator: 'CmdOrCtrl+Shift+E',
+        click: () => {
+          this.tabManager.createTab('nucleo://extensions');
+        }
+      });
+
+      const menu = Menu.buildFromTemplate(template);
+      const win = this.windowController.getWindow();
+      if (win && !win.isDestroyed()) {
+        menu.popup({
+          window: win,
+          x: typeof x === 'number' ? Math.round(x) : undefined,
+          y: typeof y === 'number' ? Math.round(y) : undefined
+        });
+      }
+      return { success: true };
+    });
+
+    // 3. Tab Context Menu
+    ipcMain.handle(IPC_CHANNELS.MENU_SHOW_TAB_CONTEXT, async (event, { tabId, x, y } = {}) => {
+      this._validateInternalSender(event);
+      const tab = this.tabManager.getTab(tabId);
+      if (!tab) return { success: false };
+
+      const allWorkspaces = this.workspaceManager ? this.workspaceManager.getAllWorkspaces() : [];
+      const otherWorkspaces = allWorkspaces.filter((w) => w.id !== tab.workspaceId);
+
+      const wsSubmenu = otherWorkspaces.length > 0
+        ? otherWorkspaces.map((ws) => ({
+            label: `${ws.icon || '💼'} ${ws.name}`,
+            click: () => {
+              if (this.tabManager) {
+                this.tabManager.moveTabToWorkspace(tabId, ws.id);
+              }
+            }
+          }))
+        : [{ label: 'Sem outros workspaces', enabled: false }];
+
+      const template = [
+        {
+          label: 'Nova aba',
+          accelerator: 'CmdOrCtrl+T',
+          click: () => this.tabManager.createTab()
+        },
+        {
+          label: 'Recarregar',
+          accelerator: 'CmdOrCtrl+R',
+          click: () => tab.reload()
+        },
+        {
+          label: 'Duplicar aba',
+          click: () => this.tabManager.duplicateTab(tabId)
+        },
+        { type: 'separator' },
+        {
+          label: 'Mover para Workspace',
+          submenu: wsSubmenu
+        },
+        { type: 'separator' },
+        {
+          label: 'Fechar aba',
+          accelerator: 'CmdOrCtrl+W',
+          click: () => this.tabManager.closeTab(tabId)
+        },
+        {
+          label: 'Fechar outras abas',
+          click: () => this.tabManager.closeOtherTabs(tabId)
+        },
+        {
+          label: 'Fechar abas à direita',
+          click: () => this.tabManager.closeTabsToTheRight(tabId)
+        }
+      ];
+
+      const menu = Menu.buildFromTemplate(template);
+      const win = this.windowController.getWindow();
+      if (win && !win.isDestroyed()) {
+        menu.popup({
+          window: win,
+          x: typeof x === 'number' ? Math.round(x) : undefined,
+          y: typeof y === 'number' ? Math.round(y) : undefined
+        });
+      }
+      return { success: true };
+    });
+
+    // 4. Workspaces Context Menu
+    ipcMain.handle(IPC_CHANNELS.MENU_SHOW_WORKSPACES_CONTEXT, async (event, { workspaceId, x, y } = {}) => {
+      this._validateInternalSender(event);
+      const ws = this.workspaceManager ? this.workspaceManager.getWorkspace(workspaceId) : null;
+      if (!ws) return { success: false };
+
+      const allWorkspaces = this.workspaceManager ? this.workspaceManager.getAllWorkspaces() : [];
+      const isLast = allWorkspaces.length <= 1;
+
+      const template = [
+        {
+          label: `Workspace: ${ws.name}`,
+          enabled: false
+        },
+        { type: 'separator' },
+        {
+          label: 'Renomear / Editar...',
+          click: () => {
+            const win = this.windowController.getWindow();
+            if (win && !win.isDestroyed()) {
+              win.webContents.send(IPC_CHANNELS.EVENT_UI_ACTION, { action: 'ws-rename', workspaceId });
+            }
+          }
+        },
+        {
+          label: 'Duplicar workspace',
+          click: async () => {
+            await this.workspaceManager.duplicateWorkspace(workspaceId);
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Mover para cima',
+          click: async () => {
+            await this.workspaceManager.moveUp(workspaceId);
+          }
+        },
+        {
+          label: 'Mover para baixo',
+          click: async () => {
+            await this.workspaceManager.moveDown(workspaceId);
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Excluir workspace',
+          enabled: !isLast,
+          click: () => {
+            const win = this.windowController.getWindow();
+            if (win && !win.isDestroyed()) {
+              win.webContents.send(IPC_CHANNELS.EVENT_UI_ACTION, { action: 'ws-delete', workspaceId });
+            }
+          }
+        }
+      ];
+
+      const menu = Menu.buildFromTemplate(template);
+      const win = this.windowController.getWindow();
+      if (win && !win.isDestroyed()) {
+        menu.popup({
+          window: win,
+          x: typeof x === 'number' ? Math.round(x) : undefined,
+          y: typeof y === 'number' ? Math.round(y) : undefined
+        });
+      }
+      return { success: true };
+    });
+
+    // 5. Shield Quick Action Menu
+    ipcMain.handle(IPC_CHANNELS.MENU_SHOW_SHIELD, async (event, { x, y, url, tabId } = {}) => {
+      this._validateInternalSender(event);
+      let domain = '';
+      if (url && typeof url === 'string') {
+        try {
+          domain = new URL(url).hostname.toLowerCase();
+        } catch {
+          domain = url.replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
+        }
+      }
+      const isSystemPage = !domain || domain.startsWith('nucleo:') || url?.startsWith('nucleo:');
+      const tabStats = this.shieldManager && tabId ? this.shieldManager.getTabStats(tabId) : null;
+      const globalStatus = this.shieldManager ? this.shieldManager.getStatus() : { enabled: true };
+      const isEnabled = globalStatus.enabled;
+      let isWhitelisted = false;
+      if (domain && this.shieldManager) {
+        const list = this.shieldManager.getWhitelist();
+        isWhitelisted = Array.isArray(list) && list.includes(domain);
+      }
+
+      const blockedCount = tabStats ? (tabStats.totalBlocked || 0) : 0;
+      const adsBlocked = tabStats ? (tabStats.adsBlocked || 0) : 0;
+      const trackersBlocked = tabStats ? (tabStats.trackersBlocked || 0) : 0;
+
+      const template = [
+        {
+          label: `🛡️ Núcleo Shield — ${domain || 'Página do Sistema'}`,
+          enabled: false
+        },
+        {
+          label: `Status: ${!isEnabled ? 'Desativado globalmente' : (isSystemPage ? 'Página interna do navegador' : (isWhitelisted ? 'Pausado neste site' : 'Protegido e ativo'))}`,
+          enabled: false
+        },
+        { type: 'separator' },
+        {
+          label: 'Bloquear anúncios e rastreadores neste site',
+          type: 'checkbox',
+          checked: isEnabled && !isWhitelisted && !isSystemPage,
+          enabled: isEnabled && !isSystemPage && Boolean(domain),
+          click: async () => {
+            if (domain && this.shieldManager) {
+              await this.shieldManager.toggleWhitelist(domain);
+              const activeTab = this.tabManager.getActiveTab();
+              if (activeTab) activeTab.reload();
+            }
+          }
+        },
+        { type: 'separator' },
+        {
+          label: `Bloqueados nesta página: ${blockedCount} (${adsBlocked} anúncios, ${trackersBlocked} rastreadores)`,
+          enabled: false
+        },
+        { type: 'separator' },
+        {
+          label: '⚙️ Configurações do Shield',
+          click: () => {
+            this.tabManager.createTab('nucleo://shield');
+          }
+        }
+      ];
+
+      const menu = Menu.buildFromTemplate(template);
+      const win = this.windowController.getWindow();
+      if (win && !win.isDestroyed()) {
+        menu.popup({
+          window: win,
+          x: typeof x === 'number' ? Math.round(x) : undefined,
+          y: typeof y === 'number' ? Math.round(y) : undefined
+        });
+      }
+      return { success: true };
+    });
+
+    // 6. Site Permissions Menu
+    ipcMain.handle(IPC_CHANNELS.MENU_SHOW_SITE_PERMISSIONS, async (event, { x, y, url } = {}) => {
+      this._validateInternalSender(event);
+      let origin = '';
+      if (url && typeof url === 'string') {
+        try {
+          const u = new URL(url);
+          origin = u.origin ? u.origin.toLowerCase() : '';
+        } catch {
+          origin = url;
+        }
+      }
+
+      const isSecure = origin.startsWith('https://') || origin.startsWith('nucleo://');
+      const isSystem = origin.startsWith('nucleo://') || !origin;
+      const siteData = this.permissionsManager && origin ? this.permissionsManager.getPermissionsForOrigin(origin) : null;
+      const sitePerms = siteData?.permissions || {};
+
+      const permTypes = [
+        { id: 'camera', label: 'Câmera' },
+        { id: 'microphone', label: 'Microfone' },
+        { id: 'geolocation', label: 'Localização' },
+        { id: 'notifications', label: 'Notificações' },
+        { id: 'clipboard', label: 'Área de Transferência' }
+      ];
+
+      const template = [
+        {
+          label: `Site: ${origin || 'Página do Sistema'}`,
+          enabled: false
+        },
+        {
+          label: isSystem ? 'Sistema Núcleo Seguro' : (isSecure ? '🔒 Conexão Segura (HTTPS)' : '⚠️ Conexão Não Criptografada'),
+          enabled: false
+        },
+        { type: 'separator' }
+      ];
+
+      if (!isSystem && origin) {
+        for (const p of permTypes) {
+          const currentState = sitePerms[p.id] || 'ask';
+          const stateLabel = currentState === 'allow' ? 'Permitido' : (currentState === 'deny' ? 'Bloqueado' : 'Perguntar');
+          template.push({
+            label: `${p.label}: ${stateLabel}`,
+            submenu: [
+              {
+                label: 'Permitir',
+                type: 'radio',
+                checked: currentState === 'allow',
+                click: async () => {
+                  if (this.permissionsManager && origin) {
+                    await this.permissionsManager.setPermission(origin, p.id, 'allow');
+                    const win = this.windowController.getWindow();
+                    if (win && !win.isDestroyed()) {
+                      win.webContents.send(IPC_CHANNELS.EVENT_PERMISSIONS_CHANGED);
+                    }
+                  }
+                }
+              },
+              {
+                label: 'Bloquear',
+                type: 'radio',
+                checked: currentState === 'deny',
+                click: async () => {
+                  if (this.permissionsManager && origin) {
+                    await this.permissionsManager.setPermission(origin, p.id, 'deny');
+                    const win = this.windowController.getWindow();
+                    if (win && !win.isDestroyed()) {
+                      win.webContents.send(IPC_CHANNELS.EVENT_PERMISSIONS_CHANGED);
+                    }
+                  }
+                }
+              },
+              {
+                label: 'Perguntar (Padrão)',
+                type: 'radio',
+                checked: currentState === 'ask',
+                click: async () => {
+                  if (this.permissionsManager && origin) {
+                    await this.permissionsManager.resetPermission(origin, p.id);
+                    const win = this.windowController.getWindow();
+                    if (win && !win.isDestroyed()) {
+                      win.webContents.send(IPC_CHANNELS.EVENT_PERMISSIONS_CHANGED);
+                    }
+                  }
+                }
+              }
+            ]
+          });
+        }
+
+        template.push({ type: 'separator' });
+        template.push({
+          label: 'Redefinir permissões deste site',
+          click: async () => {
+            if (this.permissionsManager && origin) {
+              await this.permissionsManager.resetOrigin(origin);
+              const win = this.windowController.getWindow();
+              if (win && !win.isDestroyed()) {
+                win.webContents.send(IPC_CHANNELS.EVENT_PERMISSIONS_CHANGED);
+              }
+            }
+          }
+        });
+      }
+
+      template.push({
+        label: '🛡️ Central de Privacidade & Permissões',
+        click: () => {
+          this.tabManager.createTab('nucleo://privacy');
+        }
+      });
+
+      const menu = Menu.buildFromTemplate(template);
+      const win = this.windowController.getWindow();
+      if (win && !win.isDestroyed()) {
+        menu.popup({
+          window: win,
+          x: typeof x === 'number' ? Math.round(x) : undefined,
+          y: typeof y === 'number' ? Math.round(y) : undefined
+        });
+      }
+      return { success: true };
+    });
+
+    // 7. Workspaces Quick Menu
+    ipcMain.handle(IPC_CHANNELS.MENU_SHOW_WORKSPACES, async (event, { x, y } = {}) => {
+      this._validateInternalSender(event);
+      const workspaces = this.workspaceManager ? this.workspaceManager.getAllWorkspaces() : [];
+      const activeWs = this.workspaceManager ? this.workspaceManager.getActiveWorkspace() : null;
+
+      const template = [
+        {
+          label: 'Meus Workspaces',
+          enabled: false
+        },
+        { type: 'separator' }
+      ];
+
+      for (const ws of workspaces) {
+        const isActive = activeWs && activeWs.id === ws.id;
+        const tabCount = ws.tabIds ? ws.tabIds.length : 0;
+        template.push({
+          label: `${isActive ? '● ' : '○ '}${ws.icon || '💼'} ${ws.name} (${tabCount} ${tabCount === 1 ? 'aba' : 'abas'})`,
+          type: 'checkbox',
+          checked: isActive,
+          click: () => {
+            if (!isActive && this.workspaceManager) {
+              this.workspaceManager.switchWorkspace(ws.id);
+            }
+          }
+        });
+      }
+
+      template.push({ type: 'separator' });
+      template.push({
+        label: '➕ Criar Novo Workspace (Ctrl+Alt+N)',
+        click: () => {
+          const win = this.windowController.getWindow();
+          if (win && !win.isDestroyed()) {
+            win.webContents.send(IPC_CHANNELS.EVENT_UI_ACTION, { action: 'ws-create-modal' });
+          }
+        }
+      });
+
+      const menu = Menu.buildFromTemplate(template);
+      const win = this.windowController.getWindow();
+      if (win && !win.isDestroyed()) {
+        menu.popup({
+          window: win,
+          x: typeof x === 'number' ? Math.round(x) : undefined,
+          y: typeof y === 'number' ? Math.round(y) : undefined
+        });
+      }
+      return { success: true };
     });
   }
 }

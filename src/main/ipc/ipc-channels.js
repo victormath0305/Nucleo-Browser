@@ -28,6 +28,7 @@ const IPC_CHANNELS = {
   TAB_SWITCH_NEXT: 'tab:switch-next',
   TAB_SWITCH_PREV: 'tab:switch-prev',
   TAB_SWITCH_INDEX: 'tab:switch-index',
+  TAB_SET_ACTIVE_VISIBLE: 'tab:set-active-visible',
 
   // DevTools commands
   DEVTOOLS_TOGGLE_WEB: 'devtools:toggle-web',
@@ -144,7 +145,17 @@ const IPC_CHANNELS = {
   // System & About info
   SYSTEM_GET_ABOUT_INFO: 'system:get-about-info',
 
+  // Native Menus commands
+  MENU_SHOW_MAIN: 'menu:show-main',
+  MENU_SHOW_EXTENSIONS: 'menu:show-extensions',
+  MENU_SHOW_TAB_CONTEXT: 'menu:show-tab-context',
+  MENU_SHOW_WORKSPACES_CONTEXT: 'menu:show-workspaces-context',
+  MENU_SHOW_SHIELD: 'menu:show-shield',
+  MENU_SHOW_SITE_PERMISSIONS: 'menu:show-site-permissions',
+  MENU_SHOW_WORKSPACES: 'menu:show-workspaces',
+
   // Events from Main -> Renderer
+  EVENT_UI_ACTION: 'event:ui-action',
   EVENT_TAB_UPDATED: 'event:tab-updated',
   EVENT_TAB_CREATED: 'event:tab-created',
   EVENT_TAB_CLOSED: 'event:tab-closed',

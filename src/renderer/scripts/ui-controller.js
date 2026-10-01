@@ -439,15 +439,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (btnShield) {
     btnShield.addEventListener('click', async (e) => {
       e.stopPropagation();
-      const isOpen = shieldPopover.classList.contains('show');
-      menuDropdown.classList.remove('show');
-      closeTabContextMenu();
-
-      if (isOpen) {
-        shieldPopover.classList.remove('show');
+      closeAllPopups();
+      if (api && typeof api.openShieldMenu === 'function') {
+        const rect = btnShield.getBoundingClientRect();
+        await api.openShieldMenu({
+          x: Math.round(rect.right - 240),
+          y: Math.round(rect.bottom + 4),
+          url: currentActiveTabUrl,
+          tabId: currentActiveTabId
+        });
       } else {
-        shieldPopover.classList.add('show');
-        await syncShieldForActiveTab();
+        const isOpen = shieldPopover?.classList.contains('show');
+        if (isOpen) {
+          shieldPopover?.classList.remove('show');
+        } else {
+          shieldPopover?.classList.add('show');
+          await syncShieldForActiveTab();
+        }
       }
     });
   }
@@ -517,16 +525,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (btnExtensions) {
     btnExtensions.addEventListener('click', async (e) => {
       e.stopPropagation();
-      const isOpen = extensionsPopover.classList.contains('show');
-      menuDropdown.classList.remove('show');
-      if (shieldPopover) shieldPopover.classList.remove('show');
-      closeTabContextMenu();
-
-      if (isOpen) {
-        extensionsPopover.classList.remove('show');
+      closeAllPopups();
+      if (api && typeof api.openExtensionsMenu === 'function') {
+        const rect = btnExtensions.getBoundingClientRect();
+        await api.openExtensionsMenu({
+          x: Math.round(rect.right - 240),
+          y: Math.round(rect.bottom + 4)
+        });
       } else {
-        extensionsPopover.classList.add('show');
-        await updateExtensionsPopover();
+        const isOpen = extensionsPopover?.classList.contains('show');
+        if (isOpen) {
+          extensionsPopover?.classList.remove('show');
+        } else {
+          extensionsPopover?.classList.add('show');
+          await updateExtensionsPopover();
+        }
       }
     });
   }
@@ -685,11 +698,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (securityBadge) {
     securityBadge.addEventListener('click', (e) => {
       e.stopPropagation();
-      const isVisible = sitePermissionsPopover && sitePermissionsPopover.style.display === 'flex';
       closeAllPopups();
-      if (!isVisible && sitePermissionsPopover) {
-        sitePermissionsPopover.style.display = 'flex';
-        renderSitePermissionsPopover();
+      if (api && typeof api.openSitePermissionsMenu === 'function') {
+        const rect = securityBadge.getBoundingClientRect();
+        api.openSitePermissionsMenu({
+          x: Math.round(rect.left),
+          y: Math.round(rect.bottom + 4),
+          url: currentActiveTabUrl
+        });
+      } else {
+        const isVisible = sitePermissionsPopover && sitePermissionsPopover.style.display === 'flex';
+        if (!isVisible && sitePermissionsPopover) {
+          sitePermissionsPopover.style.display = 'flex';
+          renderSitePermissionsPopover();
+        }
       }
     });
   }
@@ -852,11 +874,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // --- Tab Context Menu Handlers ---
   const openTabContextMenu = (x, y, tabId) => {
-    contextMenuTabId = tabId;
-    populateWorkspaceSubmenu(tabId);
-    tabContextMenu.style.left = `${Math.min(x, window.innerWidth - 190)}px`;
-    tabContextMenu.style.top = `${y}px`;
-    tabContextMenu.classList.add('show');
+    closeAllPopups();
+    if (api && typeof api.openTabContextMenu === 'function') {
+      api.openTabContextMenu(tabId, { x, y });
+    } else {
+      contextMenuTabId = tabId;
+      populateWorkspaceSubmenu(tabId);
+      tabContextMenu.style.left = `${Math.min(x, window.innerWidth - 190)}px`;
+      tabContextMenu.style.top = `${y}px`;
+      tabContextMenu.classList.add('show');
+    }
   };
 
   const closeTabContextMenu = () => {
@@ -906,7 +933,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     ctxWorkspaceSubmenu.appendChild(newItem);
   };
 
-  const closeAllPopups = () => {
+  function closeAllPopups() {
     menuDropdown?.classList.remove('show');
     shieldPopover?.classList.remove('show');
     extensionsPopover?.classList.remove('show');
@@ -919,7 +946,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (sitePermissionsPopover) {
       sitePermissionsPopover.style.display = 'none';
     }
-  };
+  }
 
   // --- Workspaces UI Controller Methods ---
   const updateWorkspacePill = (ws = currentActiveWorkspace) => {
@@ -990,6 +1017,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const openWorkspaceContextMenu = (x, y, wsId) => {
     closeAllPopups();
     contextMenuWsId = wsId;
+    if (api && typeof api.openWorkspacesContextMenu === 'function') {
+      api.openWorkspacesContextMenu(wsId, { x, y });
+      return;
+    }
     if (!workspaceContextMenu) return;
     if (ctxWsDelete) {
       if (currentWorkspaces.length <= 1) {
@@ -1051,6 +1082,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const openCreateWorkspaceModal = (options = {}) => {
     closeAllPopups();
+    if (api && typeof api.setActiveTabVisible === 'function') {
+      api.setActiveTabVisible(false);
+    }
     editingWorkspaceId = null;
     moveTabOnCreate = options.moveTabId || null;
     selectedModalColor = 'cyan';
@@ -1071,6 +1105,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const openEditWorkspaceModal = (wsId) => {
     closeAllPopups();
+    if (api && typeof api.setActiveTabVisible === 'function') {
+      api.setActiveTabVisible(false);
+    }
     const ws = currentWorkspaces.find((w) => w.id === wsId);
     if (!ws) return;
     editingWorkspaceId = wsId;
@@ -1095,6 +1132,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (workspaceEditModal) {
       workspaceEditModal.style.display = 'none';
     }
+    if (api && typeof api.setActiveTabVisible === 'function') {
+      api.setActiveTabVisible(true);
+    }
     editingWorkspaceId = null;
     moveTabOnCreate = null;
   };
@@ -1104,6 +1144,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (currentWorkspaces.length <= 1) {
       alert('Não é possível excluir o único workspace.');
       return;
+    }
+    if (api && typeof api.setActiveTabVisible === 'function') {
+      api.setActiveTabVisible(false);
     }
     const ws = currentWorkspaces.find((w) => w.id === wsId);
     if (!ws) return;
@@ -1119,6 +1162,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const closeDeleteModal = () => {
     if (workspaceDeleteModal) {
       workspaceDeleteModal.style.display = 'none';
+    }
+    if (api && typeof api.setActiveTabVisible === 'function') {
+      api.setActiveTabVisible(true);
     }
     deletingWorkspaceId = null;
   };
@@ -1231,7 +1277,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   btnWorkspaceSelect?.addEventListener('click', (e) => {
     e.stopPropagation();
-    toggleWorkspacePopover();
+    closeAllPopups();
+    if (api && typeof api.openWorkspacesMenu === 'function') {
+      const rect = btnWorkspaceSelect.getBoundingClientRect();
+      api.openWorkspacesMenu({
+        x: Math.round(rect.left),
+        y: Math.round(rect.bottom + 4)
+      });
+    } else {
+      toggleWorkspacePopover();
+    }
   });
 
   btnCreateWorkspace?.addEventListener('click', (e) => {
@@ -1317,7 +1372,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   btnMenu.addEventListener('click', (e) => {
     e.stopPropagation();
-    menuDropdown.classList.toggle('show');
+    closeAllPopups();
+    if (api && typeof api.openMainMenu === 'function') {
+      const rect = btnMenu.getBoundingClientRect();
+      api.openMainMenu({
+        x: Math.round(rect.right - 240),
+        y: Math.round(rect.bottom + 4)
+      });
+    } else {
+      menuDropdown.classList.toggle('show');
+    }
   });
 
   menuNewTab.addEventListener('click', () => {
@@ -1416,6 +1480,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       closeTabContextMenu();
     }
   });
+
+  // --- Native Menus UI Actions Listener ---
+  if (api && typeof api.onUIAction === 'function') {
+    api.onUIAction((data) => {
+      if (!data || !data.action) return;
+      if (data.action === 'ws-create-modal') {
+        openCreateWorkspaceModal();
+      } else if (data.action === 'ws-rename' || data.action === 'ws-color') {
+        if (data.workspaceId) openEditWorkspaceModal(data.workspaceId);
+      } else if (data.action === 'ws-delete') {
+        if (data.workspaceId) openDeleteWorkspaceModal(data.workspaceId);
+      }
+    });
+  }
 
   // --- Global Keyboard Shortcuts ---
   window.addEventListener('keydown', (e) => {
