@@ -11,6 +11,7 @@ class Tab extends EventEmitter {
   constructor(id, options = {}) {
     super();
     this.id = id;
+    this.workspaceId = options.workspaceId || null;
     this.title = options.title || 'Nova Aba';
     this.url = options.url || 'nucleo://newtab';
     this.favicon = options.favicon || null;
@@ -220,6 +221,7 @@ class Tab extends EventEmitter {
   getState() {
     return {
       id: this.id,
+      workspaceId: this.workspaceId,
       title: this.title,
       url: this.url,
       favicon: this.favicon,

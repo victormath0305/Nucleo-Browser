@@ -7,7 +7,7 @@ const path = require('path');
 
 const AppConfig = {
   appName: 'Núcleo Browser',
-  appVersion: '0.6.0',
+  appVersion: '0.7.0',
   appId: 'com.nucleobrowser.app',
 
   window: {

@@ -1,15 +1,33 @@
 /**
- * Núcleo Browser - Tab Manager
+ * Núcleo Browser - Tab Manager (v0.7.0 Workspaces-Aware)
+ * Manages Tab instances, lifecycle, active tab bounds, WebContentsViews,
+ * and seamlessly partitions tabs by Workspace contexts.
  * @module modules/tabs/tab-manager
  */
 
 const { EventEmitter } = require('events');
-const { pathToFileURL } = require('url');
 const Tab = require('./tab');
 const AppConfig = require('../../config/app-config');
 
 class TabManager extends EventEmitter {
-  constructor(browserWindowController, historyManager = null, bookmarkManager = null, shieldManager = null, settingsManager = null, searchProvider = null) {
+  /**
+   * @param {Object} browserWindowController
+   * @param {Object} [historyManager]
+   * @param {Object} [bookmarkManager]
+   * @param {Object} [shieldManager]
+   * @param {Object} [settingsManager]
+   * @param {Object} [searchProvider]
+   * @param {Object} [workspaceManager]
+   */
+  constructor(
+    browserWindowController,
+    historyManager = null,
+    bookmarkManager = null,
+    shieldManager = null,
+    settingsManager = null,
+    searchProvider = null,
+    workspaceManager = null
+  ) {
     super();
     this.windowController = browserWindowController;
     this.historyManager = historyManager;
@@ -17,9 +35,14 @@ class TabManager extends EventEmitter {
     this.shieldManager = shieldManager;
     this.settingsManager = settingsManager;
     this.searchProvider = searchProvider;
+    this.workspaceManager = workspaceManager;
     this.tabs = new Map();
     this.activeTabId = null;
     this.nextTabCounter = 1;
+
+    if (this.workspaceManager) {
+      this._attachWorkspaceEvents();
+    }
   }
 
   setShieldManager(shieldManager) {
@@ -34,9 +57,74 @@ class TabManager extends EventEmitter {
     this.searchProvider = searchProvider;
   }
 
+  setWorkspaceManager(workspaceManager) {
+    this.workspaceManager = workspaceManager;
+    if (this.workspaceManager) {
+      this._attachWorkspaceEvents();
+    }
+  }
+
+  _attachWorkspaceEvents() {
+    if (!this.workspaceManager) return;
+
+    this.workspaceManager.on('workspace-switched', ({ previousId, activeId, workspace }) => {
+      this._onWorkspaceSwitched(previousId, activeId, workspace);
+    });
+
+    this.workspaceManager.on('workspace-deleted', ({ id, tabIds, targetWorkspaceId }) => {
+      if (targetWorkspaceId) {
+        for (const tid of tabIds) {
+          const tab = this.tabs.get(tid);
+          if (tab) {
+            tab.workspaceId = targetWorkspaceId;
+          }
+        }
+      } else {
+        // Destroy orphaned tabs
+        for (const tid of tabIds) {
+          const tab = this.tabs.get(tid);
+          if (tab) {
+            const win = this.windowController.getWindow();
+            if (win?.contentView) {
+              try { win.contentView.removeChildView(tab.view); } catch {}
+            }
+            this.tabs.delete(tid);
+            tab.destroy();
+          }
+        }
+      }
+      this.emit('all-tabs-updated', this.getAllTabs());
+    });
+  }
+
+  _onWorkspaceSwitched(previousWsId, newWsId, newWorkspace) {
+    // 1. Hide all views belonging to previous workspace
+    for (const tab of this.tabs.values()) {
+      if (tab.workspaceId === previousWsId) {
+        tab.setVisible(false);
+      }
+    }
+
+    // 2. Identify tabs for the new workspace
+    const wsTabs = this.getTabsForWorkspace(newWsId);
+
+    if (wsTabs.length === 0) {
+      // Create default new tab for this workspace
+      const newTab = this.createTab(AppConfig.navigation.defaultHomepage, true, newWsId);
+      this.setActiveTab(newTab.id);
+    } else {
+      let targetTabId = newWorkspace?.activeTabId;
+      if (!targetTabId || !this.tabs.has(targetTabId) || this.tabs.get(targetTabId).workspaceId !== newWsId) {
+        targetTabId = wsTabs[0].id;
+      }
+      this.setActiveTab(targetTabId);
+    }
+
+    this.emit('all-tabs-updated', this.getAllTabs());
+  }
+
   /**
    * Resolves target initial URL.
-   * If URL is 'nucleo://newtab' or empty, resolves to 'nucleo://newtab'.
    * @param {string} [url]
    * @returns {string}
    */
@@ -54,7 +142,6 @@ class TabManager extends EventEmitter {
       return 'nucleo://newtab';
     }
 
-    // Block dangerous pseudo-protocols
     if (/^(javascript|data|vbscript):/i.test(trimmed)) {
       return 'about:blank';
     }
@@ -62,27 +149,21 @@ class TabManager extends EventEmitter {
     if (trimmed === 'nucleo://bookmarks' || trimmed === 'nucleo://favoritos') {
       return 'nucleo://bookmarks';
     }
-
     if (trimmed === 'nucleo://history' || trimmed === 'nucleo://historico') {
       return 'nucleo://history';
     }
-
     if (trimmed === 'nucleo://shield' || trimmed === 'nucleo://protecao') {
       return 'nucleo://shield';
     }
-
     if (trimmed === 'nucleo://shield-test') {
       return 'nucleo://shield-test';
     }
-
     if (trimmed === 'nucleo://extensions' || trimmed === 'nucleo://extensoes') {
       return 'nucleo://extensions';
     }
-
     if (trimmed === 'nucleo://extension-test') {
       return 'nucleo://extension-test';
     }
-
     if (trimmed === 'nucleo://settings' || trimmed === 'nucleo://configuracoes') {
       return 'nucleo://settings';
     }
@@ -111,28 +192,50 @@ class TabManager extends EventEmitter {
   }
 
   /**
+   * Returns all tabs belonging to a specific workspace ID.
+   * @param {string} [workspaceId]
+   * @returns {Array<Tab>}
+   */
+  getTabsForWorkspace(workspaceId = null) {
+    const targetWsId = workspaceId || (this.workspaceManager ? this.workspaceManager.getActiveWorkspace()?.id : null);
+    if (!targetWsId) {
+      return Array.from(this.tabs.values());
+    }
+    return Array.from(this.tabs.values()).filter((t) => t.workspaceId === targetWsId);
+  }
+
+  /**
    * Creates a new tab.
    * @param {string} [initialUrl] - Target URL to load
    * @param {boolean} [makeActive=true] - Whether to activate immediately
+   * @param {string} [targetWorkspaceId=null] - Target workspace ID (defaults to active workspace)
    * @returns {Tab} The created Tab instance
    */
-  createTab(initialUrl = AppConfig.navigation.defaultHomepage, makeActive = true) {
+  createTab(initialUrl = AppConfig.navigation.defaultHomepage, makeActive = true, targetWorkspaceId = null) {
     let effectiveMakeActive = makeActive;
     if (this.settingsManager && this.settingsManager.get('tabs.openNewTabsInBackground') && arguments.length < 2) {
       effectiveMakeActive = false;
     }
 
+    const activeWs = this.workspaceManager ? this.workspaceManager.getActiveWorkspace() : null;
+    const wsId = targetWorkspaceId || (activeWs ? activeWs.id : 'workspace-pessoal');
+    const isCurrentWs = !activeWs || activeWs.id === wsId;
+
     const resolvedUrl = this._resolveUrl(initialUrl);
     const tabId = `tab-${this.nextTabCounter++}`;
-    const tab = new Tab(tabId, { url: resolvedUrl });
+    const tab = new Tab(tabId, { url: resolvedUrl, workspaceId: wsId });
 
     this.tabs.set(tabId, tab);
+
+    if (this.workspaceManager) {
+      this.workspaceManager.addTabToWorkspace(wsId, tabId);
+    }
 
     // Attach to window's view hierarchy
     const win = this.windowController.getWindow();
     if (win && win.contentView) {
       win.contentView.addChildView(tab.view);
-      if (!makeActive) {
+      if (!isCurrentWs || !effectiveMakeActive) {
         tab.setVisible(false);
       }
     }
@@ -189,7 +292,7 @@ class TabManager extends EventEmitter {
     // Handle target="_blank" and window.open requests from web pages
     tab.on('request-new-tab', ({ url, disposition }) => {
       const activate = disposition !== 'background-tab';
-      this.createTab(url, activate);
+      this.createTab(url, activate, tab.workspaceId);
     });
 
     // Handle global keyboard shortcuts forwarded from the web content
@@ -200,8 +303,13 @@ class TabManager extends EventEmitter {
     this.emit('tab-created', tab.getState());
     this.emit('all-tabs-updated', this.getAllTabs());
 
-    if (makeActive || !this.activeTabId) {
+    if (isCurrentWs && (effectiveMakeActive || !this.activeTabId)) {
       this.setActiveTab(tabId);
+    } else if (!isCurrentWs && this.workspaceManager) {
+      const ws = this.workspaceManager.getWorkspace(wsId);
+      if (ws && !ws.activeTabId) {
+        this.workspaceManager.setActiveTabForWorkspace(wsId, tabId);
+      }
     }
 
     if (resolvedUrl) {
@@ -217,7 +325,43 @@ class TabManager extends EventEmitter {
   _handleTabKeyboardShortcut(input, event, tabId) {
     const isCtrl = input.control || input.meta;
     const isShift = input.shift;
+    const isAlt = input.alt;
     const key = input.key ? input.key.toLowerCase() : '';
+
+    // Workspace shortcuts (Ctrl + Alt + ...)
+    if (isCtrl && isAlt && key === 'n') {
+      event.preventDefault();
+      if (this.workspaceManager) {
+        this.workspaceManager.createWorkspace({ name: 'Novo Workspace' }).then((ws) => {
+          this.switchWorkspace(ws.id);
+        });
+      }
+      return;
+    }
+
+    if (isCtrl && isAlt && key === 'arrowleft') {
+      event.preventDefault();
+      if (this.workspaceManager) {
+        this.workspaceManager.switchPreviousWorkspace();
+      }
+      return;
+    }
+
+    if (isCtrl && isAlt && key === 'arrowright') {
+      event.preventDefault();
+      if (this.workspaceManager) {
+        this.workspaceManager.switchNextWorkspace();
+      }
+      return;
+    }
+
+    if (isCtrl && isAlt && input.key >= '1' && input.key <= '8') {
+      event.preventDefault();
+      if (this.workspaceManager) {
+        this.workspaceManager.switchToIndex(parseInt(input.key, 10) - 1);
+      }
+      return;
+    }
 
     if (isCtrl && isShift && key === 'b') {
       event.preventDefault();
@@ -260,7 +404,8 @@ class TabManager extends EventEmitter {
       this.switchToIndex(parseInt(input.key, 10) - 1);
     } else if (isCtrl && input.key === '9') {
       event.preventDefault();
-      this.switchToIndex(this.tabs.size - 1);
+      const currentTabs = this.getTabsForWorkspace();
+      this.switchToIndex(currentTabs.length - 1);
     } else if ((isCtrl && key === 'r') || key === 'f5') {
       event.preventDefault();
       const tab = this.tabs.get(tabId);
@@ -300,9 +445,13 @@ class TabManager extends EventEmitter {
     }
 
     this.activeTabId = tabId;
+
+    if (this.workspaceManager && newTab.workspaceId) {
+      this.workspaceManager.setActiveTabForWorkspace(newTab.workspaceId, tabId);
+    }
+
     newTab.setVisible(true);
 
-    // Update bounds to fit the current window content area
     const contentBounds = this.windowController.getWebContentBounds();
     newTab.setBounds(contentBounds);
 
@@ -313,30 +462,35 @@ class TabManager extends EventEmitter {
 
   /**
    * Closes a tab by ID.
-   * If the last tab is closed, a fresh new tab is created so the window is never empty.
+   * If the last tab in the workspace is closed, creates a fresh new tab so the workspace is never empty.
    * @param {string} tabId
    */
   closeTab(tabId) {
     const tab = this.tabs.get(tabId);
     if (!tab) return;
 
+    const wsId = tab.workspaceId || (this.workspaceManager ? this.workspaceManager.getActiveWorkspace()?.id : null);
+    const wsTabs = this.getTabsForWorkspace(wsId);
     const win = this.windowController.getWindow();
 
-    // If closing the last tab, create a new fresh tab first
-    if (this.tabs.size === 1) {
-      this.createTab(AppConfig.navigation.defaultHomepage, true);
+    // If closing the last tab of this workspace, create a fresh new tab first
+    if (wsTabs.length === 1) {
+      this.createTab(AppConfig.navigation.defaultHomepage, true, wsId);
     }
 
-    // If closing the active tab, switch to an adjacent tab
+    // If closing the active tab, switch to an adjacent tab in the SAME workspace
     if (this.activeTabId === tabId) {
-      const keys = Array.from(this.tabs.keys());
-      const currentIndex = keys.indexOf(tabId);
+      const currentWsTabs = this.getTabsForWorkspace(wsId);
+      const currentIndex = currentWsTabs.findIndex((t) => t.id === tabId);
       let targetId = null;
 
       if (currentIndex > 0) {
-        targetId = keys[currentIndex - 1];
-      } else if (currentIndex < keys.length - 1) {
-        targetId = keys[currentIndex + 1];
+        targetId = currentWsTabs[currentIndex - 1].id;
+      } else if (currentIndex < currentWsTabs.length - 1) {
+        targetId = currentWsTabs[currentIndex + 1].id;
+      } else {
+        const remaining = currentWsTabs.filter((t) => t.id !== tabId);
+        if (remaining.length > 0) targetId = remaining[0].id;
       }
 
       if (targetId && targetId !== tabId) {
@@ -353,9 +507,15 @@ class TabManager extends EventEmitter {
     }
 
     this.tabs.delete(tabId);
+
+    if (this.workspaceManager && wsId) {
+      this.workspaceManager.removeTabFromWorkspace(wsId, tabId);
+    }
+
     if (this.shieldManager) {
       this.shieldManager.onTabClosed(tabId);
     }
+
     this.emit('tab-closed', { id: tabId });
     this.emit('all-tabs-updated', this.getAllTabs());
 
@@ -363,7 +523,61 @@ class TabManager extends EventEmitter {
   }
 
   /**
-   * Duplicates a tab by ID.
+   * Switches workspace context.
+   * @param {string} targetWorkspaceId
+   */
+  async switchWorkspace(targetWorkspaceId) {
+    if (!this.workspaceManager) return;
+    await this.workspaceManager.switchWorkspace(targetWorkspaceId);
+  }
+
+  /**
+   * Moves a tab from its current workspace to another.
+   * @param {string} tabId
+   * @param {string} targetWorkspaceId
+   * @param {boolean} [activateInTarget=false]
+   */
+  moveTabToWorkspace(tabId, targetWorkspaceId, activateInTarget = false) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+
+    const sourceWsId = tab.workspaceId;
+    if (sourceWsId === targetWorkspaceId) return;
+
+    // Ensure source workspace doesn't become empty
+    const sourceTabs = this.getTabsForWorkspace(sourceWsId);
+    if (sourceTabs.length === 1) {
+      this.createTab(AppConfig.navigation.defaultHomepage, true, sourceWsId);
+    }
+
+    // If tab was active in source workspace, switch active tab of source
+    if (this.activeTabId === tabId && !activateInTarget) {
+      const remainingSource = this.getTabsForWorkspace(sourceWsId).filter((t) => t.id !== tabId);
+      if (remainingSource.length > 0) {
+        this.setActiveTab(remainingSource[0].id);
+      }
+      tab.setVisible(false);
+    }
+
+    tab.workspaceId = targetWorkspaceId;
+
+    if (this.workspaceManager) {
+      this.workspaceManager.moveTab(tabId, targetWorkspaceId);
+    }
+
+    if (activateInTarget && this.workspaceManager) {
+      this.workspaceManager.switchWorkspace(targetWorkspaceId).then(() => {
+        this.setActiveTab(tabId);
+      });
+    } else {
+      this.emit('all-tabs-updated', this.getAllTabs());
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Duplicates a tab by ID within its current workspace.
    * @param {string} tabId
    * @returns {Tab|null}
    */
@@ -372,104 +586,108 @@ class TabManager extends EventEmitter {
     if (!tab) return null;
 
     const currentUrl = tab.url;
-    return this.createTab(currentUrl, true);
+    return this.createTab(currentUrl, true, tab.workspaceId);
   }
 
   /**
-   * Closes all tabs except the specified target tab.
+   * Closes all tabs except the specified target tab in the same workspace.
    * @param {string} targetTabId
    */
   closeOtherTabs(targetTabId) {
-    if (!this.tabs.has(targetTabId)) return;
+    const targetTab = this.tabs.get(targetTabId);
+    if (!targetTab) return;
+
+    const wsId = targetTab.workspaceId;
+    const wsTabs = this.getTabsForWorkspace(wsId);
 
     this.setActiveTab(targetTabId);
 
-    const otherTabIds = Array.from(this.tabs.keys()).filter((id) => id !== targetTabId);
-    for (const id of otherTabIds) {
-      const t = this.tabs.get(id);
-      if (t) {
-        const win = this.windowController.getWindow();
-        if (win?.contentView) {
-          try {
-            win.contentView.removeChildView(t.view);
-          } catch {}
-        }
-        this.tabs.delete(id);
-        this.emit('tab-closed', { id });
-        t.destroy();
+    const tabsToClose = wsTabs.filter((t) => t.id !== targetTabId);
+    for (const t of tabsToClose) {
+      const win = this.windowController.getWindow();
+      if (win?.contentView) {
+        try { win.contentView.removeChildView(t.view); } catch {}
       }
+      this.tabs.delete(t.id);
+      if (this.workspaceManager && wsId) {
+        this.workspaceManager.removeTabFromWorkspace(wsId, t.id);
+      }
+      this.emit('tab-closed', { id: t.id });
+      t.destroy();
     }
 
     this.emit('all-tabs-updated', this.getAllTabs());
   }
 
   /**
-   * Closes all tabs to the right of the specified target tab.
+   * Closes all tabs to the right of the specified target tab in the same workspace.
    * @param {string} targetTabId
    */
   closeTabsToTheRight(targetTabId) {
-    const keys = Array.from(this.tabs.keys());
-    const targetIndex = keys.indexOf(targetTabId);
+    const targetTab = this.tabs.get(targetTabId);
+    if (!targetTab) return;
+
+    const wsId = targetTab.workspaceId;
+    const wsTabs = this.getTabsForWorkspace(wsId);
+    const targetIndex = wsTabs.findIndex((t) => t.id === targetTabId);
     if (targetIndex === -1) return;
 
-    const tabsToClose = keys.slice(targetIndex + 1);
+    const tabsToClose = wsTabs.slice(targetIndex + 1);
     if (tabsToClose.length === 0) return;
 
-    // If active tab is among those to be closed, activate targetTabId
-    if (tabsToClose.includes(this.activeTabId)) {
+    const closingActive = tabsToClose.some((t) => t.id === this.activeTabId);
+    if (closingActive) {
       this.setActiveTab(targetTabId);
     }
 
-    for (const id of tabsToClose) {
-      const t = this.tabs.get(id);
-      if (t) {
-        const win = this.windowController.getWindow();
-        if (win?.contentView) {
-          try {
-            win.contentView.removeChildView(t.view);
-          } catch {}
-        }
-        this.tabs.delete(id);
-        this.emit('tab-closed', { id });
-        t.destroy();
+    for (const t of tabsToClose) {
+      const win = this.windowController.getWindow();
+      if (win?.contentView) {
+        try { win.contentView.removeChildView(t.view); } catch {}
       }
+      this.tabs.delete(t.id);
+      if (this.workspaceManager && wsId) {
+        this.workspaceManager.removeTabFromWorkspace(wsId, t.id);
+      }
+      this.emit('tab-closed', { id: t.id });
+      t.destroy();
     }
 
     this.emit('all-tabs-updated', this.getAllTabs());
   }
 
   /**
-   * Switches to the next tab cyclically.
+   * Switches to the next tab cyclically within the active workspace.
    */
   switchNextTab() {
-    const keys = Array.from(this.tabs.keys());
-    if (keys.length <= 1) return;
+    const wsTabs = this.getTabsForWorkspace();
+    if (wsTabs.length <= 1) return;
 
-    const currentIndex = keys.indexOf(this.activeTabId);
-    const nextIndex = (currentIndex + 1) % keys.length;
-    this.setActiveTab(keys[nextIndex]);
+    const currentIndex = wsTabs.findIndex((t) => t.id === this.activeTabId);
+    const nextIndex = (currentIndex + 1) % wsTabs.length;
+    this.setActiveTab(wsTabs[nextIndex].id);
   }
 
   /**
-   * Switches to the previous tab cyclically.
+   * Switches to the previous tab cyclically within the active workspace.
    */
   switchPreviousTab() {
-    const keys = Array.from(this.tabs.keys());
-    if (keys.length <= 1) return;
+    const wsTabs = this.getTabsForWorkspace();
+    if (wsTabs.length <= 1) return;
 
-    const currentIndex = keys.indexOf(this.activeTabId);
-    const prevIndex = (currentIndex - 1 + keys.length) % keys.length;
-    this.setActiveTab(keys[prevIndex]);
+    const currentIndex = wsTabs.findIndex((t) => t.id === this.activeTabId);
+    const prevIndex = (currentIndex - 1 + wsTabs.length) % wsTabs.length;
+    this.setActiveTab(wsTabs[prevIndex].id);
   }
 
   /**
-   * Switches to a specific tab index (0-based).
+   * Switches to a specific tab index (0-based) within the active workspace.
    * @param {number} index
    */
   switchToIndex(index) {
-    const keys = Array.from(this.tabs.keys());
-    if (index >= 0 && index < keys.length) {
-      this.setActiveTab(keys[index]);
+    const wsTabs = this.getTabsForWorkspace();
+    if (index >= 0 && index < wsTabs.length) {
+      this.setActiveTab(wsTabs[index].id);
     }
   }
 
@@ -506,10 +724,23 @@ class TabManager extends EventEmitter {
   }
 
   /**
-   * Returns state list of all tabs.
+   * Returns state list of tabs in the currently active workspace.
+   * @param {string} [forWorkspaceId=null]
    * @returns {Array<Object>}
    */
-  getAllTabs() {
+  getAllTabs(forWorkspaceId = null) {
+    const wsTabs = this.getTabsForWorkspace(forWorkspaceId);
+    return wsTabs.map((t) => ({
+      ...t.getState(),
+      isActive: t.id === this.activeTabId
+    }));
+  }
+
+  /**
+   * Returns state list of ALL tabs across ALL workspaces.
+   * @returns {Array<Object>}
+   */
+  getAllTabsGlobal() {
     return Array.from(this.tabs.values()).map((t) => ({
       ...t.getState(),
       isActive: t.id === this.activeTabId

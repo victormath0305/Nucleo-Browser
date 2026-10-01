@@ -20,6 +20,7 @@ const { ExtensionManager, ExtensionStore } = require('../src/main/modules/extens
 const { SettingsManager, SettingsStore } = require('../src/main/modules/settings');
 const { SearchProvider } = require('../src/main/modules/search');
 const { DefaultBrowserManager } = require('../src/main/modules/default-browser');
+const { WorkspaceManager, WorkspaceStore } = require('../src/main/modules/workspaces');
 const IpcHandlerRegistry = require('../src/main/ipc/ipc-handlers');
 
 const tempBmPath = path.join(os.tmpdir(), `nucleo-int-bm-${Date.now()}.json`);
@@ -27,10 +28,11 @@ const tempHistPath = path.join(os.tmpdir(), `nucleo-int-hist-${Date.now()}.json`
 const tempShieldPath = path.join(os.tmpdir(), `nucleo-int-shield-${Date.now()}.json`);
 const tempExtPath = path.join(os.tmpdir(), `nucleo-int-ext-${Date.now()}.json`);
 const tempSettingsPath = path.join(os.tmpdir(), `nucleo-int-settings-${Date.now()}.json`);
+const tempWsPath = path.join(os.tmpdir(), `nucleo-int-ws-${Date.now()}.json`);
 const tempExtDir = path.join(os.tmpdir(), `nucleo-int-ext-dir-${Date.now()}`);
 
 app.whenReady().then(async () => {
-  console.log('--- Initializing Integration Test Environment (v0.6.0 Settings, Extensions & Shield) ---');
+  console.log('--- Initializing Integration Test Environment (v0.7.0 Workspaces, Settings, Extensions & Shield) ---');
   await fs.promises.mkdir(tempExtDir, { recursive: true });
 
   const engine = new BrowserEngine();
@@ -62,6 +64,10 @@ app.whenReady().then(async () => {
   });
   await extensionManager.initialize();
 
+  const workspaceStore = new WorkspaceStore(tempWsPath);
+  const workspaceManager = new WorkspaceManager(workspaceStore);
+  await workspaceManager.initialize();
+
   const windowController = new BrowserWindowController();
   const tabManager = new TabManager(
     windowController,
@@ -69,7 +75,8 @@ app.whenReady().then(async () => {
     bookmarkManager,
     shieldManager,
     settingsManager,
-    searchProvider
+    searchProvider,
+    workspaceManager
   );
   windowController.setTabManager(tabManager);
 
@@ -88,6 +95,7 @@ app.whenReady().then(async () => {
     settingsManager,
     searchProvider,
     defaultBrowserManager,
+    workspaceManager,
     browserEngine: engine
   });
   ipcRegistry.registerAll();
@@ -422,6 +430,58 @@ app.whenReady().then(async () => {
   console.assert(!settingsInHistory, 'nucleo://settings was improperly recorded in history!');
   console.log('✔ nucleo://settings verified, omnibox search updated, and excluded from history');
 
+  // Test 15: Workspaces — Contextos de Abas, Isolamento e Transição sem Recarregar
+  console.log('\n[Test 15] Workspaces — Contextos de Abas, Isolamento e Transição sem Recarregar...');
+  
+  // 15.1: Initial default workspace
+  const activeWs = workspaceManager.getActiveWorkspace();
+  console.assert(activeWs !== null, 'Test 15.1 Failed: No active workspace found');
+  console.assert(activeWs.name === 'Pessoal', `Test 15.1 Failed: Expected Pessoal, got ${activeWs.name}`);
+  console.log(`✔ Workspace padrão ativo verificado: ${activeWs.name} (${activeWs.id})`);
+
+  // 15.2: Create new workspace "Trabalho"
+  const trabalhoWs = await workspaceManager.createWorkspace({ name: 'Trabalho', color: 'indigo', icon: 'briefcase' });
+  console.assert(trabalhoWs && trabalhoWs.id, 'Test 15.2 Failed: Failed to create Trabalho workspace');
+  console.assert(workspaceManager.activeWorkspaceId === trabalhoWs.id, 'Test 15.2 Failed: New workspace should be active');
+
+  // Create tabs in "Trabalho"
+  const tabTrabalho1 = tabManager.createTab('nucleo://newtab', true, trabalhoWs.id);
+  const tabTrabalho2 = tabManager.createTab('about:blank', false, trabalhoWs.id);
+  console.assert(tabManager.getAllTabs().length === 2, `Test 15.2 Failed: Expected 2 tabs in Trabalho, got ${tabManager.getAllTabs().length}`);
+  console.assert(tabTrabalho1.view.getVisible() === true, 'Test 15.2 Failed: Active tab in Trabalho should be visible');
+  console.log(`✔ Workspace Trabalho criado com 2 abas isoladas (IDs: ${tabTrabalho1.id}, ${tabTrabalho2.id})`);
+
+  // 15.3: Switch to Pessoal without destroying or reloading views
+  await tabManager.switchWorkspace(activeWs.id);
+  console.assert(workspaceManager.activeWorkspaceId === activeWs.id, 'Test 15.3 Failed: Active workspace should be Pessoal');
+  // In Pessoal, Trabalho's tabs must have view.getVisible() === false
+  console.assert(tabTrabalho1.view.getVisible() === false, 'Test 15.3 Failed: Tab from inactive workspace must be hidden');
+  console.assert(tabTrabalho2.view.getVisible() === false, 'Test 15.3 Failed: Inactive tab from inactive workspace must be hidden');
+  console.log('✔ Transição para Pessoal: WebContentsViews do workspace Trabalho ocultadas com estado intacto');
+
+  // 15.4: Switch back to Trabalho and check visibility restored
+  await tabManager.switchWorkspace(trabalhoWs.id);
+  console.assert(tabTrabalho1.view.getVisible() === true, 'Test 15.4 Failed: Active tab in Trabalho should be visible again');
+  console.log('✔ Retorno ao workspace Trabalho: aba ativa restaurada com visibilidade imediata sem reload');
+
+  // 15.5: Move tab from Trabalho to Pessoal
+  const moveTabResult = await tabManager.moveTabToWorkspace(tabTrabalho2.id, activeWs.id, false);
+  console.assert(moveTabResult && moveTabResult.success === true, 'Test 15.5 Failed: moveTabToWorkspace failed');
+  console.assert(!workspaceManager.getWorkspace(trabalhoWs.id).tabIds.includes(tabTrabalho2.id), 'Test 15.5 Failed: Tab still in source workspace');
+  console.assert(workspaceManager.getWorkspace(activeWs.id).tabIds.includes(tabTrabalho2.id), 'Test 15.5 Failed: Tab not in target workspace');
+  console.log('✔ Mover aba entre workspaces verificado com sucesso');
+
+  // 15.6: Duplicate workspace
+  const dupWs = await workspaceManager.duplicateWorkspace(trabalhoWs.id);
+  console.assert(dupWs && dupWs.id !== trabalhoWs.id, 'Test 15.6 Failed: Duplication failed or reused ID');
+  console.assert(dupWs.name.includes('(Cópia)'), 'Test 15.6 Failed: Duplicate name should include (Cópia)');
+  console.log(`✔ Duplicação segura de workspace verificada: ${dupWs.name}`);
+
+  // 15.7: Delete workspace with tab migration
+  await workspaceManager.deleteWorkspace(dupWs.id, { targetWorkspaceId: activeWs.id });
+  console.assert(workspaceManager.getWorkspace(dupWs.id) === null, 'Test 15.7 Failed: Workspace was not deleted');
+  console.log('✔ Exclusão de workspace com migração segura de abas verificada');
+
   console.log('\n--- Teardown ---');
   tabManager.destroyAll();
   windowController.close();
@@ -433,6 +493,7 @@ app.whenReady().then(async () => {
     if (fs.existsSync(tempShieldPath)) fs.unlinkSync(tempShieldPath);
     if (fs.existsSync(tempExtPath)) fs.unlinkSync(tempExtPath);
     if (fs.existsSync(tempSettingsPath)) fs.unlinkSync(tempSettingsPath);
+    if (fs.existsSync(tempWsPath)) fs.unlinkSync(tempWsPath);
     if (fs.existsSync(tempExtDir)) fs.rmSync(tempExtDir, { recursive: true, force: true });
   } catch {}
 

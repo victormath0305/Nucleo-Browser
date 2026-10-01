@@ -1,12 +1,13 @@
 {
   "name": "nucleo-browser",
   "productName": "Núcleo Browser",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Navegador desktop moderno, seguro e modular baseado em Chromium",
   "main": "src/main/index.js",
   "scripts": {
     "start": "electron .",
     "test": "node scripts/test-runner.js",
+    "test:unit": "node -e \"process.env.UNIT_ONLY='1'; require('./scripts/test-runner.js');\"",
     "generate-icons": "electron scripts/generate-icons.js",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",

@@ -1,6 +1,6 @@
-# Núcleo Browser (v0.6.0)
+# Núcleo Browser (v0.7.0)
 
-> Navegador desktop moderno, rápido e seguro baseado em **Chromium** e **Electron** para Windows, desenvolvido com arquitetura modular desacoplada, bloqueador nativo de anúncios, suporte real a extensões Chromium (MV2/MV3) e central de configurações avançada.
+> Navegador desktop moderno, rápido e seguro baseado em **Chromium** e **Electron** para Windows, desenvolvido com arquitetura modular desacoplada, Workspaces e contextos de abas sem recarregamento, bloqueador nativo de anúncios, suporte a extensões Chromium (MV2/MV3) e central de configurações avançada.
 
 ---
 
@@ -8,15 +8,16 @@
 
 O **Núcleo Browser** é um navegador desktop real desenvolvido para o sistema operacional Windows. Seu objetivo principal é fornecer uma experiência de navegação veloz, privada e altamente customizável, combinando o poder do motor **Chromium** com subsistemas nativos desenvolvidos do zero de forma modular.
 
-### Destaques Técnicos da Versão Atual (v0.6.0)
+### Destaques Técnicos da Versão Atual (v0.7.0)
+* **Workspaces & Gestão de Contextos de Abas**: Contextos independentes de abas (ex: Pessoal, Trabalho, Estudos) dentro de uma única janela principal com alternância instantânea sem recarregamento de páginas (`WebContentsView.setVisible`).
 * **Motor Chromium 152 & Electron 44**: Compatibilidade total com as mais modernas APIs web (HTML5, CSS3, WebAssembly, WebGL, WebRTC e ES2024).
-* **Central de Configurações (`nucleo://settings`)**: Painel de controle completo com suporte a temas dinâmicos (Sistema, Escuro e Claro), 5 cores de acento, seleção de buscador padrão, preferências de inicialização, downloads e privacidade.
+* **Central de Configurações (`nucleo://settings`)**: Painel de controle completo com suporte a temas dinâmicos (Sistema, Escuro e Claro), 5 cores de acento, gerenciamento de Workspaces, seleção de buscador padrão, preferências de inicialização, downloads e privacidade.
 * **Mecanismos de Busca Dinâmicos**: 6 provedores verificados pré-configurados (DuckDuckGo, Google, Bing, Brave, Ecosia, Startpage) e suporte completo a buscadores personalizados com `%s`.
 * **Detecção Confiável de Navegador Padrão Windows**: Verificação real no Registro do Windows (`UserChoice`) e fluxo oficial via `ms-settings:defaultapps`.
 * **Suporte Real a Extensões Chromium**: Carregamento nativo via API de Sessão do Chromium/Electron com suporte a Manifest V3 (Service Workers) e Manifest V2, isolamento local de pastas e popups nativos.
 * **Núcleo Shield (Ad & Tracker Blocker)**: Bloqueio nativo antes do envio à rede via `session.webRequest.onBeforeRequest`, com regras estilo Adblock Plus, decisão $O(1)$ com LRU Cache e whitelist de exceções.
 * **Sistema Multi-Abas com `WebContentsView`**: Cada aba é um processo renderizador independente e isolado, garantindo alta performance, estabilidade e ausência de vazamento de memória.
-* **Favoritos & Histórico Persistentes**: Estrutura hierárquica em árvore de pastas, gravação atômica serializada em disco com recuperação automática contra corrupção.
+* **Favoritos, Histórico & Workspaces Persistentes**: Estruturas hierárquicas e relacionais, gravação atômica serializada em disco com recuperação automática contra corrupção.
 * **Segurança de Nível Bancário**: `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`, isolamento de esquemas privilegiados e sanitização defensiva contra injeções.
 
 ---
@@ -132,18 +133,31 @@ Para oferecer uma experiência de navegador de primeira classe, registramos o pr
 * **Histórico com Retenção Inteligente**: Registra visitas reais (com título, data, favicon e contador de acessos), expurga automaticamente registros antigos acima de 10.000 itens e exclui rigorosamente páginas internas (`nucleo://`) e sessões privadas.
 * **Limpeza Granular de Dados**: Modal para expurgar histórico, cache e cookies por períodos (Última hora, 24 horas, 7 dias ou todo o período).
 
+### 8. Workspaces & Gestão de Contextos de Abas (Novo na v0.7.0)
+* **Contextos Independentes sem Janelas Múltiplas**: Agrupamento lógico de abas em fluxos de trabalho (ex: Pessoal, Trabalho, Estudos) dentro da janela principal única do navegador.
+* **Preservação de Estado com `WebContentsView`**: Ao trocar de workspace, as abas anteriores NÃO são destruídas e NÃO recarregam. As views inativas apenas têm sua visibilidade desativada (`view.setVisible(false)`), preservando formulários, scroll, histórico e memória intactos.
+* **Aba Ativa Memorizada**: Cada workspace lembra individualmente qual era sua aba em foco (`activeTabId`), restaurando-a instantaneamente ao retornar.
+* **Identidade Visual Customizável**: 7 cores de acento (`cyan`, `indigo`, `purple`, `green`, `amber`, `red`, `pink`) e 8 ícones (`home`, `briefcase`, `book`, `code`, `gamepad`, `school`, `folder`, `star`).
+* **Menu de Contexto de Aba**: Opção "Mover para Workspace" permite transferir abas existentes ou criar um novo workspace diretamente a partir da aba ativa.
+* **Duplicação Segura**: Clona a lista de abas e URLs sem duplicar cookies, credenciais ou tokens privados de autenticação.
+* **Exclusão Segura com Confirmação**: Permite escolher entre migrar as abas para outro workspace ou encerrá-las, impedindo a exclusão do último workspace restante.
+
 ---
 
 ## 4. Atalhos de Teclado
 
 | Atalho | Ação |
 | :--- | :--- |
-| `Ctrl + T` | Abrir nova aba |
-| `Ctrl + W` | Fechar aba ativa |
+| `Ctrl + Alt + ArrowRight` | Próximo Workspace |
+| `Ctrl + Alt + ArrowLeft` | Workspace Anterior |
+| `Ctrl + Alt + 1` .. `9` | Ir diretamente para o Workspace N |
+| `Ctrl + Alt + N` | Criar Novo Workspace |
+| `Ctrl + T` | Abrir nova aba no workspace ativo |
+| `Ctrl + W` | Fechar aba ativa do workspace |
 | `Ctrl + Tab` | Alternar para a próxima aba (cíclica) |
 | `Ctrl + Shift + Tab` | Alternar para a aba anterior (cíclica) |
-| `Ctrl + 1` .. `Ctrl + 8` | Ir diretamente para a aba 1 .. 8 |
-| `Ctrl + 9` | Ir para a última aba aberta |
+| `Ctrl + 1` .. `Ctrl + 8` | Ir diretamente para a aba 1 .. 8 do workspace |
+| `Ctrl + 9` | Ir para a última aba aberta do workspace |
 | `Ctrl + L` / `Alt + D` | Focar na barra de endereços (Omnibox) |
 | `Ctrl + R` / `F5` | Recarregar aba atual |
 | `Alt + Seta Esquerda` | Voltar página no histórico da aba |
@@ -155,6 +169,7 @@ Para oferecer uma experiência de navegador de primeira classe, registramos o pr
 | `Ctrl + H` | Abrir Histórico de Navegação (`nucleo://history`) |
 | `F12` | Abrir DevTools da página web ativa |
 | `Ctrl + Shift + I` | Abrir DevTools da interface do navegador |
+| `Escape` | Fechar menus, popovers e caixas de diálogo |
 
 ---
 
@@ -178,6 +193,10 @@ src/
 │   │   │   ├── settings-validator.js    # Validação estrita e sanitização de URLs
 │   │   │   ├── settings-store.js        # Persistência atômica serializada (settings.json)
 │   │   │   ├── settings-manager.js      # API com notação de ponto, eventos e resets
+│   │   ├── workspaces/                  # Subsistema de Workspaces & Contextos de Abas
+│   │   │   ├── workspace-model.js       # Modelo validado, sanitização, cores e ícones
+│   │   │   ├── workspace-store.js       # Persistência atômica serializada (workspaces.json)
+│   │   │   ├── workspace-manager.js     # Gestão de ciclo de vida, transições e regras
 │   │   │   └── index.js                 # Fachada pública do módulo
 │   │   ├── search/                      # Subsistema de Mecanismos de Busca
 │   │   │   ├── search-engines.js        # 6 buscadores pré-configurados com %s
@@ -298,7 +317,7 @@ npm run dist:run
 
 O instalador gerado estará localizado em:
 ```text
-dist/Núcleo Browser Setup 0.6.0.exe
+dist/Núcleo Browser Setup 0.7.0.exe
 ```
 
 ---
@@ -311,7 +330,7 @@ dist/Núcleo Browser Setup 0.6.0.exe
 - [x] **v0.4.0**: Núcleo Shield — Bloqueador nativo de anúncios e rastreadores na camada de rede.
 - [x] **v0.5.0**: Sistema de Extensões Chromium reais (Manifest V2 e V3) e isolamento local.
 - [x] **v0.6.0**: Central de Configurações (`nucleo://settings`), Provedores de Busca, Navegador Padrão e Temas.
-- [ ] **v0.7.0**: Workspaces para organização de tarefas e contextos de abas.
+- [x] **v0.7.0**: Workspaces para organização de tarefas e contextos de abas sem recarregamento.
 - [ ] **v0.8.0**: Downloads Manager com painel visual flutuante e controle de velocidade.
 - [ ] **v0.9.0**: Inteligência Artificial contextual integrada ao navegador.
 

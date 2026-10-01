@@ -1,6 +1,6 @@
-# Arquitetura Técnica — Núcleo Browser (v0.6.0 — Central de Configurações)
+# Arquitetura Técnica — Núcleo Browser (v0.7.0 — Workspaces & Gestão de Contextos de Abas)
 
-Este documento descreve a fundamentação de engenharia, a seleção de tecnologias, a arquitetura de processos, o sistema completo de abas, os subsistemas de favoritos, histórico, Núcleo Shield, Sistema de Extensões Chromium (MV3 & MV2), a Central de Configurações persistente, Provedores de Busca, detecção de Navegador Padrão Windows, a estratégia de persistência local atômica serializada, os padrões de segurança e a modularidade do **Núcleo Browser**.
+Este documento descreve a fundamentação de engenharia, a seleção de tecnologias, a arquitetura de processos, o sistema completo de abas, os subsistemas de Workspaces, favoritos, histórico, Núcleo Shield, Sistema de Extensões Chromium (MV3 & MV2), a Central de Configurações persistente, Provedores de Busca, detecção de Navegador Padrão Windows, a estratégia de persistência local atômica serializada, os padrões de segurança e a modularidade do **Núcleo Browser**.
 
 ---
 
@@ -40,18 +40,18 @@ O Núcleo Browser adota rigorosamente a arquitetura multi-processos do Chromium:
 │  └────────┬──────────┘  └────────┬─────────┘  └──────────┬──────────┘  │
 │           │                      │                       │             │
 │  ┌────────┴──────────┐  ┌────────┴─────────┐  ┌──────────┴──────────┐  │
-│  │   ShieldManager   │  │  BookmarkManager │  │    HistoryManager   │  │
-│  │(Blocking/Session) │  │  (Store/Folders) │  │    (Visits/Prune)   │  │
+│  │   ShieldManager   │  │  BookmarkManager │  │  WorkspaceManager   │  │
+│  │(Blocking/Session) │  │  (Store/Folders) │  │ (Contexts / Switch) │  │
 │  └────────┬──────────┘  └────────┬─────────┘  └──────────┬──────────┘  │
 │           │                      │                       │             │
 │  ┌────────┴──────────┐  ┌────────┴─────────┐  ┌──────────┴──────────┐  │
-│  │   ShieldEngine    │  │  BookmarkStore   │  │    HistoryStore     │  │
-│  │ (Rules/LRU Cache) │  │ (bookmarks.json) │  │    (history.json)   │  │
+│  │   ShieldEngine    │  │  BookmarkStore   │  │   WorkspaceStore    │  │
+│  │ (Rules/LRU Cache) │  │ (bookmarks.json) │  │  (workspaces.json)  │  │
 │  └────────┬──────────┘  └──────────────────┘  └─────────────────────┘  │
 │           │                                                            │
 │  ┌────────┴──────────┐  ┌──────────────────┐  ┌─────────────────────┐  │
-│  │FilterStore & Stats│  │ NavigationCtrl   │  │   SecurityManager   │  │
-│  │   (shield.json)   │  │ (URL Resolution) │  │  (Permissions/CSP)  │  │
+│  │FilterStore & Stats│  │ NavigationCtrl   │  │   HistoryManager    │  │
+│  │   (shield.json)   │  │ (URL Resolution) │  │   (history.json)    │  │
 │  └───────────────────┘  └──────────────────┘  └─────────────────────┘  │
 │                                  │                                     │
 │                         IPC Handlers Registry                          │
@@ -373,20 +373,73 @@ Configuradas centralizadamente no ciclo de vida em `src/main/app.js`:
 
 ---
 
-## 13. Estrutura Modular de Diretórios
+## 13. Subsistema de Workspaces & Gestão de Contextos de Abas (`WorkspaceManager`, `WorkspaceStore` e `WorkspaceModel`)
+
+Localizado em `src/main/modules/workspaces/`:
+
+### 13.1. Arquitetura de Janela Única e Ciclo de Vida de `WebContentsView`
+* **Sem Proliferação de Janelas**: Os Workspaces operam estritamente dentro da mesma janela principal (`BrowserWindow`). O conceito de Workspace é um particionamento lógico e independente de abas.
+* **Preservação de Estado via Visibilidade (`tab.setVisible`)**:
+  * Ao alternar entre workspaces, as instâncias de `WebContentsView` do workspace inativo **NÃO são destruídas e NÃO sofrem recarregamento**.
+  * O `TabManager` executa `tab.setVisible(false)` para as abas do workspace anterior e `tab.setVisible(true)` para a aba ativa do novo workspace.
+  * Conexões WebSockets, formulários em digitação, árvores DOM, memória JavaScript e histórico de navegação (Back/Forward) permanecem 100% íntegros em segundo plano.
+* **Aba Ativa por Workspace**:
+  * Cada workspace mantém a propriedade `activeTabId`.
+  * Ao retornar para um workspace, o foco e a visibilidade são restaurados instantaneamente para a aba ativa daquele contexto sem interferir nos demais.
+
+### 13.2. Modelo de Dados (`WorkspaceModel`)
+* **Propriedades Estruturais**:
+  ```json
+  {
+    "id": "ws-1727700000000-a1b2",
+    "name": "Trabalho",
+    "color": "indigo",
+    "icon": "briefcase",
+    "createdAt": 1727700000000,
+    "updatedAt": 1727700000000,
+    "activeTabId": "tab-123",
+    "tabIds": ["tab-123", "tab-456"]
+  }
+  ```
+* **Validação e Sanitização Defensiva**:
+  * Nome limitado entre 1 e 40 caracteres, com remoção de espaços em excesso e quebras de linha (`\r\n\t`). Fallback seguro para `"Workspace"`.
+  * IDs únicos e imutáveis gerados com timestamp e entropia aleatória; IDs nunca são reciclados.
+  * 7 cores de acento suportadas: `cyan`, `indigo`, `purple`, `green`, `amber`, `red`, `pink`.
+  * 8 ícones temáticos suportados: `home`, `briefcase`, `book`, `code`, `gamepad`, `school`, `folder`, `star`.
+
+### 13.3. Persistência Atômica Serializada (`WorkspaceStore`)
+* Localizado em `app.getPath('userData')/workspaces.json`.
+* **Escrita Atômica via NTFS**: Grava em arquivo temporário `.tmp.<timestamp>.<rand>` e renomeia via `fs.promises.rename`.
+* **Fila Serializada com Promise**: Chamadas concorrentes de salvamento aguardam o término da escrita em andamento e processam imediatamente qualquer modificação subsequente sem criar conflitos `EBUSY` no Windows.
+* **Recuperação Automática contra Corrupção**: Se o arquivo `workspaces.json` for corrompido, o store renomeia o arquivo corrompido para `.corrupted.<timestamp>`, gera um novo arquivo com o workspace padrão `"Pessoal"` e restabelece a integridade sem travar a inicialização do navegador.
+
+### 13.4. Regras de Negócio e Segurança
+* **Proteção contra Exclusão do Último Workspace**: O navegador nunca fica sem workspace ativo. Se houver apenas 1 workspace, a exclusão é estritamente bloqueada no Manager e na interface.
+* **Confirmação e Migração de Abas**: A exclusão de um workspace com abas exige confirmação explícita, oferecendo a opção de migrar as abas para outro workspace (`targetWorkspaceId`) antes da exclusão.
+* **Duplicação Segura**: Clona a estrutura e URLs das abas sem copiar cookies privados, senhas ou tokens de sessão.
+* **Segurança de IPC**: Canais `WORKSPACES_*` são protegidos por `isInternalPage` no Preload e `_validateInternalSender` no processo principal, impedindo qualquer acesso por scripts de terceiros da web.
+
+---
+
+## 14. Estrutura Modular de Diretórios
 
 ```text
 src/
 ├── main/
 │   ├── config/
-│   │   └── app-config.js                # Configurações globais, versão (0.6.0) e caminhos
+│   │   └── app-config.js                # Configurações globais, versão (0.7.0) e caminhos
 │   ├── core/
 │   │   ├── browser-engine.js            # Inicialização do Chromium, sessões e protocolo nucleo://
 │   │   └── browser-window.js            # Janela frameless e cálculo de bounds dinâmicos
 │   ├── ipc/
-│   │   ├── ipc-channels.js              # Canais e eventos IPC (Settings, Search, DefaultBrowser, Shield, Extensões)
+│   │   ├── ipc-channels.js              # Canais e eventos IPC (Settings, Search, DefaultBrowser, Workspaces, Shield, Extensões)
 │   │   └── ipc-handlers.js              # Registro e delegação de comandos IPC seguros
 │   ├── modules/
+│   │   ├── workspaces/                  # Subsistema de Workspaces & Contextos de Abas
+│   │   │   ├── workspace-model.js       # Modelo, validação de nomes, cores e ícones
+│   │   │   ├── workspace-store.js       # Persistência atômica serializada (workspaces.json)
+│   │   │   ├── workspace-manager.js     # Gestor de ciclo de vida, switches e regras
+│   │   │   └── index.js                 # Exportações do módulo Workspaces
 │   │   ├── settings/                    # Subsistema Central de Configurações
 │   │   │   ├── settings-schema.js       # Definição formal do schema e restrições
 │   │   │   ├── settings-defaults.js     # Valores padrão das seções

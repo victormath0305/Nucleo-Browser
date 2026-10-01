@@ -36,6 +36,16 @@
             </svg>
           </button>
         </div>
+
+        <!-- Workspace Pill Selector -->
+        <div class="workspace-pill-container" id="workspacePillContainer">
+          <button class="workspace-pill-btn" id="btnWorkspaceSelect" title="Alternar Workspace (Ctrl+Alt+Left/Right)" aria-label="Workspaces" aria-haspopup="true">
+            <span class="workspace-pill-dot" id="workspaceActiveDot"></span>
+            <span class="workspace-pill-icon" id="workspaceActiveIcon">🏠</span>
+            <span class="workspace-pill-name" id="workspaceActiveName">Pessoal</span>
+            <svg class="workspace-pill-chevron" viewBox="0 0 16 16"><path d="M 4 6 L 8 10 L 12 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
+        </div>
       </div>
 
       <!-- Center: Tab Strip Container -->
@@ -364,9 +374,88 @@
       <div class="context-menu-item" id="ctxReloadTab">Recarregar</div>
       <div class="context-menu-item" id="ctxDuplicateTab">Duplicar aba</div>
       <div class="menu-divider"></div>
+      <div class="context-menu-item has-submenu" id="ctxMoveWorkspaceItem">
+        <div class="ctx-item-content">
+          <span>Mover para Workspace</span>
+          <span class="ctx-chevron">›</span>
+        </div>
+        <div class="ctx-submenu" id="ctxWorkspaceSubmenu">
+          <!-- Injected dynamically -->
+        </div>
+      </div>
+      <div class="menu-divider"></div>
       <div class="context-menu-item" id="ctxCloseTab">Fechar aba</div>
       <div class="context-menu-item" id="ctxCloseOtherTabs">Fechar outras abas</div>
       <div class="context-menu-item" id="ctxCloseTabsRight">Fechar abas à direita</div>
+    </div>
+
+    <!-- Workspace Popover / Dropdown -->
+    <div class="workspace-popover" id="workspacePopover" style="display: none;">
+      <div class="workspace-popover-header">
+        <span class="workspace-popover-title">Meus Workspaces</span>
+        <button class="ws-btn-add" id="btnCreateWorkspace" title="Criar Workspace (Ctrl+Alt+N)">
+          <svg viewBox="0 0 16 16"><path d="M 8 3 L 8 13 M 3 8 L 13 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span>Novo</span>
+        </button>
+      </div>
+      <div class="workspace-items-list" id="workspaceItemsList">
+        <!-- Injected dynamically -->
+      </div>
+    </div>
+
+    <!-- Workspace Context Menu (Right Click on Workspace item) -->
+    <div class="context-menu" id="workspaceContextMenu" style="display: none;">
+      <div class="context-menu-item" id="ctxWsRename">Renomear</div>
+      <div class="context-menu-item" id="ctxWsChangeColor">Alterar cor...</div>
+      <div class="context-menu-item" id="ctxWsChangeIcon">Alterar ícone...</div>
+      <div class="context-menu-item" id="ctxWsDuplicate">Duplicar</div>
+      <div class="menu-divider"></div>
+      <div class="context-menu-item" id="ctxWsMoveUp">Mover para cima</div>
+      <div class="context-menu-item" id="ctxWsMoveDown">Mover para baixo</div>
+      <div class="menu-divider"></div>
+      <div class="context-menu-item text-danger" id="ctxWsDelete">Excluir</div>
+    </div>
+
+    <!-- Modal: Workspace Create/Edit Dialog -->
+    <div class="modal-backdrop" id="workspaceEditModal" style="display: none;">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3 id="workspaceModalTitle">Novo Workspace</h3>
+          <button class="modal-close-btn" id="btnWsModalClose">&times;</button>
+        </div>
+        <div class="modal-body">
+          <label class="modal-label" for="wsInputName">Nome do Workspace</label>
+          <input type="text" id="wsInputName" class="modal-input" placeholder="Ex: Trabalho, Estudos, Pessoal..." maxlength="40" autocomplete="off">
+          
+          <label class="modal-label">Cor de Destaque</label>
+          <div class="ws-color-picker" id="wsColorPicker"></div>
+
+          <label class="modal-label">Ícone</label>
+          <div class="ws-icon-picker" id="wsIconPicker"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn secondary-btn" id="btnWsModalCancel">Cancelar</button>
+          <button class="modal-btn primary-btn" id="btnWsModalSave">Salvar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Delete Workspace Confirmation -->
+    <div class="modal-backdrop" id="workspaceDeleteModal" style="display: none;">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>Excluir Workspace?</h3>
+          <button class="modal-close-btn" id="btnWsDeleteClose">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p id="wsDeleteMessage" class="modal-description">Este workspace possui abas abertas. O que você deseja fazer?</p>
+          <div class="ws-delete-actions">
+            <button class="modal-btn secondary-btn full-width" id="btnWsDeleteMoveTabs">Mover abas para outro Workspace</button>
+            <button class="modal-btn danger-btn full-width" id="btnWsDeleteCloseTabs">Fechar abas e excluir</button>
+            <button class="modal-btn tertiary-btn full-width" id="btnWsDeleteCancel">Cancelar</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

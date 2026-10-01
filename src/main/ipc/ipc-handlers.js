@@ -21,7 +21,8 @@ class IpcHandlerRegistry {
     settingsManager = null,
     searchProvider = null,
     defaultBrowserManager = null,
-    browserEngine = null
+    browserEngine = null,
+    workspaceManager = null
   }) {
     this.windowController = windowController;
     this.tabManager = tabManager;
@@ -35,6 +36,7 @@ class IpcHandlerRegistry {
     this.searchProvider = searchProvider;
     this.defaultBrowserManager = defaultBrowserManager;
     this.browserEngine = browserEngine;
+    this.workspaceManager = workspaceManager;
   }
 
   registerAll() {
@@ -51,6 +53,7 @@ class IpcHandlerRegistry {
     this._registerDefaultBrowserHandlers();
     this._registerPrivacyHandlers();
     this._registerSystemHandlers();
+    this._registerWorkspaceHandlers();
     this._forwardTabEventsToRenderer();
     this._forwardDataEventsToRenderer();
   }
@@ -597,6 +600,121 @@ class IpcHandlerRegistry {
         broadcastEvent(IPC_CHANNELS.EVENT_DEFAULT_BROWSER_CHANGED, data);
       });
     }
+
+    if (this.workspaceManager) {
+      this.workspaceManager.on('workspaces-updated', (workspaces) => {
+        broadcastEvent(IPC_CHANNELS.EVENT_WORKSPACES_UPDATED, workspaces);
+      });
+
+      this.workspaceManager.on('workspace-activated', (workspace) => {
+        broadcastEvent(IPC_CHANNELS.EVENT_WORKSPACE_ACTIVATED, workspace);
+      });
+    }
+  }
+
+  _validateInternalSender(event) {
+    if (!event || !event.senderFrame) return true;
+    const url = event.senderFrame.url;
+    if (!url) return true;
+    if (url.startsWith('nucleo://') || url.startsWith('file://')) {
+      return true;
+    }
+    throw new Error('Acesso negado: páginas web externas não podem acessar as APIs de Workspaces.');
+  }
+
+  _registerWorkspaceHandlers() {
+    if (!this.workspaceManager) return;
+
+    ipcMain.handle(IPC_CHANNELS.WORKSPACES_GET_ALL, (event) => {
+      this._validateInternalSender(event);
+      return this.workspaceManager.getAllWorkspaces();
+    });
+
+    ipcMain.handle(IPC_CHANNELS.WORKSPACES_GET_ACTIVE, (event) => {
+      this._validateInternalSender(event);
+      return this.workspaceManager.getActiveWorkspace().toJSON();
+    });
+
+    ipcMain.handle(IPC_CHANNELS.WORKSPACES_CREATE, async (event, data = {}) => {
+      this._validateInternalSender(event);
+      const ws = await this.workspaceManager.createWorkspace(data);
+      if (this.tabManager) {
+        await this.tabManager.switchWorkspace(ws.id);
+      }
+      return ws.toJSON();
+    });
+
+    ipcMain.handle(IPC_CHANNELS.WORKSPACES_RENAME, async (event, { id, name }) => {
+      this._validateInternalSender(event);
+      return await this.workspaceManager.renameWorkspace(id, name);
+    });
+
+    ipcMain.handle(IPC_CHANNELS.WORKSPACES_SET_COLOR, async (event, { id, color }) => {
+      this._validateInternalSender(event);
+      return await this.workspaceManager.setColor(id, color);
+    });
+
+    ipcMain.handle(IPC_CHANNELS.WORKSPACES_SET_ICON, async (event, { id, icon }) => {
+      this._validateInternalSender(event);
+      return await this.workspaceManager.setIcon(id, icon);
+    });
+
+    ipcMain.handle(IPC_CHANNELS.WORKSPACES_SWITCH, async (event, id) => {
+      this._validateInternalSender(event);
+      if (this.tabManager) {
+        await this.tabManager.switchWorkspace(id);
+      } else {
+        await this.workspaceManager.switchWorkspace(id);
+      }
+      return { success: true };
+    });
+
+    ipcMain.handle(IPC_CHANNELS.WORKSPACES_DELETE, async (event, { id, targetWorkspaceId }) => {
+      this._validateInternalSender(event);
+      return await this.workspaceManager.deleteWorkspace(id, { targetWorkspaceId });
+    });
+
+    ipcMain.handle(IPC_CHANNELS.WORKSPACES_DUPLICATE, async (event, id) => {
+      this._validateInternalSender(event);
+      const dup = await this.workspaceManager.duplicateWorkspace(id);
+      if (this.tabManager) {
+        const sourceTabs = this.tabManager.getTabsForWorkspace(id);
+        if (sourceTabs.length > 0) {
+          sourceTabs.forEach((t, i) => {
+            this.tabManager.createTab(t.url, i === 0, dup.id);
+          });
+        } else {
+          this.tabManager.createTab(AppConfig.navigation.defaultHomepage, true, dup.id);
+        }
+      }
+      return dup.toJSON();
+    });
+
+    ipcMain.handle(IPC_CHANNELS.WORKSPACES_REORDER, async (event, orderedIds) => {
+      this._validateInternalSender(event);
+      await this.workspaceManager.reorderWorkspaces(orderedIds);
+      return { success: true };
+    });
+
+    ipcMain.handle(IPC_CHANNELS.WORKSPACES_MOVE_UP, async (event, id) => {
+      this._validateInternalSender(event);
+      await this.workspaceManager.moveWorkspaceUp(id);
+      return { success: true };
+    });
+
+    ipcMain.handle(IPC_CHANNELS.WORKSPACES_MOVE_DOWN, async (event, id) => {
+      this._validateInternalSender(event);
+      await this.workspaceManager.moveWorkspaceDown(id);
+      return { success: true };
+    });
+
+    ipcMain.handle(IPC_CHANNELS.WORKSPACES_MOVE_TAB, async (event, { tabId, targetWorkspaceId, activateInTarget }) => {
+      this._validateInternalSender(event);
+      if (this.tabManager) {
+        this.tabManager.moveTabToWorkspace(tabId, targetWorkspaceId, activateInTarget);
+      }
+      return { success: true };
+    });
   }
 }
 

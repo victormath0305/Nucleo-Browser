@@ -15,9 +15,10 @@ const { ExtensionValidator, ExtensionStore, ExtensionManager, ExtensionEvents } 
 const { SettingsValidator, SettingsStore, SettingsManager, getDefaultSettings } = require('../src/main/modules/settings');
 const { SearchProvider, BUILTIN_SEARCH_ENGINES } = require('../src/main/modules/search');
 const { DefaultBrowserManager } = require('../src/main/modules/default-browser');
+const { WorkspaceModel, WorkspaceStore, WorkspaceManager } = require('../src/main/modules/workspaces');
 
 async function runUnitTests() {
-  console.log('=== [1/2] Executing Unit Tests (v0.6.0 Settings, Search, Extensions, Shield, Bookmarks & History) ===\n');
+  console.log('=== [1/2] Executing Unit Tests (v0.7.0 Workspaces, Settings, Search, Extensions, Shield, Bookmarks & History) ===\n');
 
   // --- 1. Navigation Resolution Tests ---
   console.log('[Suite 1: Navigation Controller]');
@@ -595,6 +596,118 @@ async function runUnitTests() {
   console.assert(searchNavResult.includes('google.com/search') && searchNavResult.includes('aprendendo%20electron'), 'NavigationController did not use active SearchProvider');
   console.log('  ✔ NavigationController resolution for nucleo://settings and active SearchProvider verified');
 
+  // --- 8. Workspaces Subsystem Tests ---
+  console.log('\n[Suite 8: Workspaces Subsystem]');
+  const tempWsPath = path.join(os.tmpdir(), `nucleo-test-ws-${Date.now()}.json`);
+  const wsStore = new WorkspaceStore(tempWsPath);
+  const wsManager = new WorkspaceManager(wsStore);
+  await wsManager.initialize();
+
+  // Test 8.1: Default Workspace creation
+  const defaultWs = wsManager.getActiveWorkspace();
+  console.assert(defaultWs !== null, 'Active workspace should exist');
+  console.assert(defaultWs.name === 'Pessoal', `Default workspace should be "Pessoal", got ${defaultWs.name}`);
+  console.assert(wsManager.getAll().length === 1, 'Should have exactly 1 workspace initialized');
+  console.log('  ✔ Default workspace created and active (Pessoal)');
+
+  // Test 8.2: Model Sanitization
+  const modelSanitized = new WorkspaceModel({
+    name: '   Super Long Workspace Name That Exceeds The Maximum Limit Of Characters In Length Strongly   ',
+    color: 'invalid-color',
+    icon: 'invalid-icon'
+  });
+  console.assert(modelSanitized.name.length <= 40, 'WorkspaceModel should enforce max 40 chars on name');
+  console.assert(modelSanitized.color === 'cyan', 'WorkspaceModel should fallback invalid color to cyan');
+  console.assert(modelSanitized.icon === 'briefcase', 'WorkspaceModel should fallback invalid icon to briefcase');
+  console.log('  ✔ WorkspaceModel validation and input sanitization verified');
+
+  // Test 8.3: Create Workspace
+  const createdWs = await wsManager.create({ name: 'Trabalho', color: 'indigo', icon: 'code' });
+  console.assert(createdWs !== null, 'Failed to create workspace');
+  console.assert(createdWs.name === 'Trabalho', 'Workspace name incorrect');
+  console.assert(createdWs.color === 'indigo', 'Workspace color incorrect');
+  console.assert(createdWs.icon === 'code', 'Workspace icon incorrect');
+  console.assert(wsManager.activeWorkspaceId === createdWs.id, 'New workspace should become active');
+  console.assert(wsManager.getAll().length === 2, 'Total workspaces should be 2');
+  console.log('  ✔ createWorkspace with unique ID, custom color/icon, and auto-activation verified');
+
+  // Test 8.4: Rename, Color & Icon updates
+  await wsManager.rename(createdWs.id, 'Projetos Dev');
+  console.assert(wsManager.get(createdWs.id).name === 'Projetos Dev', 'Rename failed');
+  await wsManager.setColor(createdWs.id, 'purple');
+  console.assert(wsManager.get(createdWs.id).color === 'purple', 'Set color failed');
+  await wsManager.setIcon(createdWs.id, 'school');
+  console.assert(wsManager.get(createdWs.id).icon === 'school', 'Set icon failed');
+  console.log('  ✔ rename, setColor and setIcon verified');
+
+  // Test 8.5: Tab Association & Switching
+  wsManager.addTabToWorkspace(createdWs.id, 'tab-101');
+  wsManager.addTabToWorkspace(createdWs.id, 'tab-102');
+  wsManager.setActiveTab(createdWs.id, 'tab-102');
+  console.assert(wsManager.get(createdWs.id).activeTabId === 'tab-102', 'Active tab in workspace failed');
+  console.assert(wsManager.findWorkspaceByTabId('tab-101').id === createdWs.id, 'findWorkspaceByTabId failed');
+
+  // Switch back to Pessoal
+  await wsManager.switchWorkspace(defaultWs.id);
+  console.assert(wsManager.activeWorkspaceId === defaultWs.id, 'Switch workspace failed');
+  // Switch back to Projetos Dev: activeTabId must be preserved
+  await wsManager.switchWorkspace(createdWs.id);
+  console.assert(wsManager.get(createdWs.id).activeTabId === 'tab-102', 'ActiveTabId restoration failed on switch');
+  console.log('  ✔ Workspace tab association, activeTabId tracking & switching verified');
+
+  // Test 8.6: Move Tab Between Workspaces
+  const moveRes = await wsManager.moveTab('tab-101', defaultWs.id);
+  console.assert(moveRes.success === true, 'moveTab failed');
+  console.assert(!wsManager.get(createdWs.id).tabIds.includes('tab-101'), 'Tab still in source workspace');
+  console.assert(wsManager.get(defaultWs.id).tabIds.includes('tab-101'), 'Tab not added to target workspace');
+  console.log('  ✔ moveTab between workspaces verified');
+
+  // Test 8.7: Reorder Workspaces
+  await wsManager.moveUp(createdWs.id);
+  console.assert(wsManager.getAll()[0].id === createdWs.id, 'moveUp failed');
+  await wsManager.moveDown(createdWs.id);
+  console.assert(wsManager.getAll()[1].id === createdWs.id, 'moveDown failed');
+  console.log('  ✔ reordering (moveUp / moveDown) verified');
+
+  // Test 8.8: Duplication
+  const dupWs = await wsManager.duplicate(createdWs.id);
+  console.assert(dupWs !== null && dupWs.id !== createdWs.id, 'duplicate failed or reused ID');
+  console.assert(dupWs.name.includes('(Cópia)'), 'Duplicated workspace should include (Cópia)');
+  console.assert(Array.isArray(dupWs.tabIds), 'TabIds in clone should be an array');
+  console.log('  ✔ duplicateWorkspace with safe ID regeneration verified');
+
+  // Test 8.9: Deletion constraints and tab migration
+  // Cannot delete last workspace
+  while (wsManager.getAll().length > 1) {
+    const toRemove = wsManager.getAll()[wsManager.getAll().length - 1];
+    await wsManager.delete(toRemove.id, { targetWorkspaceId: defaultWs.id });
+  }
+  console.assert(wsManager.getAll().length === 1, 'Should have exactly 1 workspace left');
+  let threwOnLastDelete = false;
+  try {
+    await wsManager.delete(wsManager.getAll()[0].id);
+  } catch (err) {
+    threwOnLastDelete = true;
+  }
+  console.assert(threwOnLastDelete === true, 'Should refuse to delete the last remaining workspace');
+  console.log('  ✔ Deletion constraints (cannot delete last workspace) verified');
+
+  // Test 8.10: Persistence & Corruption Recovery
+  await wsStore.save({
+    version: 1,
+    activeWorkspaceId: 'ws-corrupt',
+    workspaces: [{ id: 'ws-corrupt', name: 'Corrupt Test', tabIds: [] }]
+  });
+  const reloadedData = await wsStore.load();
+  console.assert(reloadedData.activeWorkspaceId === 'ws-corrupt', 'Store reload failed');
+
+  // Simulate disk corruption
+  fs.writeFileSync(tempWsPath, '{ corrupted json: !!@@##');
+  const recoveredData = await wsStore.load();
+  console.assert(recoveredData && Array.isArray(recoveredData.workspaces) && recoveredData.workspaces.length >= 1, 'Corruption recovery failed to produce valid default data');
+  console.assert(recoveredData.workspaces[0].name === 'Pessoal', 'Corruption recovery should provide default Pessoal workspace');
+  console.log('  ✔ Atomic persistence and JSON corruption recovery verified');
+
   // Cleanup temp files
   try {
     if (fs.existsSync(tempBmPath)) fs.unlinkSync(tempBmPath);
@@ -602,6 +715,7 @@ async function runUnitTests() {
     if (fs.existsSync(tempShieldPath)) fs.unlinkSync(tempShieldPath);
     if (fs.existsSync(tempExtStorePath)) fs.unlinkSync(tempExtStorePath);
     if (fs.existsSync(tempSettingsPath)) fs.unlinkSync(tempSettingsPath);
+    if (fs.existsSync(tempWsPath)) fs.unlinkSync(tempWsPath);
     if (fs.existsSync(tempExtDir)) await fs.promises.rm(tempExtDir, { recursive: true, force: true });
   } catch {}
 
@@ -644,7 +758,7 @@ async function main() {
     }
     await runIntegrationTest();
     console.log('\n=============================================');
-    console.log('  ALL NÚCLEO BROWSER v0.6.0 TESTS PASSED (100%)');
+    console.log('  ALL NÚCLEO BROWSER v0.7.0 TESTS PASSED (100%)');
     console.log('=============================================\n');
     process.exit(0);
   } catch (err) {

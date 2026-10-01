@@ -105,6 +105,21 @@ const IPC_CHANNELS = {
   // Privacy commands
   PRIVACY_CLEAR_DATA: 'privacy:clear-data',
 
+  // Workspaces commands
+  WORKSPACES_GET_ALL: 'workspaces:get-all',
+  WORKSPACES_GET_ACTIVE: 'workspaces:get-active',
+  WORKSPACES_CREATE: 'workspaces:create',
+  WORKSPACES_RENAME: 'workspaces:rename',
+  WORKSPACES_SET_COLOR: 'workspaces:set-color',
+  WORKSPACES_SET_ICON: 'workspaces:set-icon',
+  WORKSPACES_SWITCH: 'workspaces:switch',
+  WORKSPACES_DELETE: 'workspaces:delete',
+  WORKSPACES_DUPLICATE: 'workspaces:duplicate',
+  WORKSPACES_REORDER: 'workspaces:reorder',
+  WORKSPACES_MOVE_UP: 'workspaces:move-up',
+  WORKSPACES_MOVE_DOWN: 'workspaces:move-down',
+  WORKSPACES_MOVE_TAB: 'workspaces:move-tab',
+
   // System & About info
   SYSTEM_GET_ABOUT_INFO: 'system:get-about-info',
 
@@ -126,7 +141,9 @@ const IPC_CHANNELS = {
   EVENT_SETTINGS_CHANGED: 'event:settings-changed',
   EVENT_THEME_CHANGED: 'event:theme-changed',
   EVENT_SEARCH_ENGINE_CHANGED: 'event:search-engine-changed',
-  EVENT_DEFAULT_BROWSER_CHANGED: 'event:default-browser-changed'
+  EVENT_DEFAULT_BROWSER_CHANGED: 'event:default-browser-changed',
+  EVENT_WORKSPACES_UPDATED: 'event:workspaces-updated',
+  EVENT_WORKSPACE_ACTIVATED: 'event:workspace-activated'
 };
 
 module.exports = IPC_CHANNELS;

@@ -82,6 +82,40 @@ document.addEventListener('DOMContentLoaded', async () => {
   const ctxCloseTab = document.getElementById('ctxCloseTab');
   const ctxCloseOtherTabs = document.getElementById('ctxCloseOtherTabs');
   const ctxCloseTabsRight = document.getElementById('ctxCloseTabsRight');
+  const ctxWorkspaceSubmenu = document.getElementById('ctxWorkspaceSubmenu');
+
+  // DOM Elements - Workspaces
+  const btnWorkspaceSelect = document.getElementById('btnWorkspaceSelect');
+  const workspaceActiveDot = document.getElementById('workspaceActiveDot');
+  const workspaceActiveIcon = document.getElementById('workspaceActiveIcon');
+  const workspaceActiveName = document.getElementById('workspaceActiveName');
+  const workspacePopover = document.getElementById('workspacePopover');
+  const workspaceItemsList = document.getElementById('workspaceItemsList');
+  const btnCreateWorkspace = document.getElementById('btnCreateWorkspace');
+  const workspaceContextMenu = document.getElementById('workspaceContextMenu');
+  const ctxWsRename = document.getElementById('ctxWsRename');
+  const ctxWsChangeColor = document.getElementById('ctxWsChangeColor');
+  const ctxWsChangeIcon = document.getElementById('ctxWsChangeIcon');
+  const ctxWsDuplicate = document.getElementById('ctxWsDuplicate');
+  const ctxWsMoveUp = document.getElementById('ctxWsMoveUp');
+  const ctxWsMoveDown = document.getElementById('ctxWsMoveDown');
+  const ctxWsDelete = document.getElementById('ctxWsDelete');
+
+  // DOM Elements - Modals
+  const workspaceEditModal = document.getElementById('workspaceEditModal');
+  const workspaceModalTitle = document.getElementById('workspaceModalTitle');
+  const wsInputName = document.getElementById('wsInputName');
+  const wsColorPicker = document.getElementById('wsColorPicker');
+  const wsIconPicker = document.getElementById('wsIconPicker');
+  const btnWsModalSave = document.getElementById('btnWsModalSave');
+  const btnWsModalCancel = document.getElementById('btnWsModalCancel');
+  const btnWsModalClose = document.getElementById('btnWsModalClose');
+  const workspaceDeleteModal = document.getElementById('workspaceDeleteModal');
+  const wsDeleteMessage = document.getElementById('wsDeleteMessage');
+  const btnWsDeleteMoveTabs = document.getElementById('btnWsDeleteMoveTabs');
+  const btnWsDeleteCloseTabs = document.getElementById('btnWsDeleteCloseTabs');
+  const btnWsDeleteCancel = document.getElementById('btnWsDeleteCancel');
+  const btnWsDeleteClose = document.getElementById('btnWsDeleteClose');
 
   let contextMenuTabId = null;
   let currentTabs = [];
@@ -91,6 +125,56 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentActiveTabFavicon = null;
   let currentLoading = false;
   let isBarVisible = false;
+
+  // Workspaces State
+  let currentWorkspaces = [];
+  let currentActiveWorkspace = null;
+  let contextMenuWsId = null;
+  let editingWorkspaceId = null;
+  let moveTabOnCreate = null;
+  let deletingWorkspaceId = null;
+  let selectedModalColor = 'cyan';
+  let selectedModalIcon = 'briefcase';
+
+  const WORKSPACE_ICONS = [
+    { id: 'home', symbol: '🏠', label: 'Início' },
+    { id: 'briefcase', symbol: '💼', label: 'Trabalho' },
+    { id: 'book', symbol: '📖', label: 'Leitura' },
+    { id: 'code', symbol: '💻', label: 'Código' },
+    { id: 'gamepad', symbol: '🎮', label: 'Jogos' },
+    { id: 'school', symbol: '🎓', label: 'Estudos' },
+    { id: 'folder', symbol: '📁', label: 'Pastas' },
+    { id: 'star', symbol: '⭐', label: 'Destaque' }
+  ];
+
+  const WORKSPACE_COLORS = [
+    { id: 'cyan', hex: '#00e5ff' },
+    { id: 'indigo', hex: '#6366f1' },
+    { id: 'purple', hex: '#a855f7' },
+    { id: 'green', hex: '#10b981' },
+    { id: 'amber', hex: '#f59e0b' },
+    { id: 'red', hex: '#ef4444' },
+    { id: 'pink', hex: '#ec4899' }
+  ];
+
+  const getIconSymbol = (iconId) => {
+    const item = WORKSPACE_ICONS.find((i) => i.id === iconId);
+    return item ? item.symbol : '💼';
+  };
+
+  const getColorHex = (colorId) => {
+    const item = WORKSPACE_COLORS.find((c) => c.id === colorId);
+    return item ? item.hex : '#00e5ff';
+  };
+
+  const escapeHtml = (str) => {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  };
 
   // Address Bar Helper
   const addressBar = new window.AddressBarHelper(addressInput, omniboxWrapper);
@@ -545,6 +629,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // --- Tab Context Menu Handlers ---
   const openTabContextMenu = (x, y, tabId) => {
     contextMenuTabId = tabId;
+    populateWorkspaceSubmenu(tabId);
     tabContextMenu.style.left = `${Math.min(x, window.innerWidth - 190)}px`;
     tabContextMenu.style.top = `${y}px`;
     tabContextMenu.classList.add('show');
@@ -554,6 +639,378 @@ document.addEventListener('DOMContentLoaded', async () => {
     tabContextMenu.classList.remove('show');
     contextMenuTabId = null;
   };
+
+  const populateWorkspaceSubmenu = (tabId) => {
+    if (!ctxWorkspaceSubmenu) return;
+    ctxWorkspaceSubmenu.innerHTML = '';
+
+    const otherWorkspaces = currentWorkspaces.filter((ws) => !ws.isActive);
+
+    if (otherWorkspaces.length === 0) {
+      const emptyItem = document.createElement('div');
+      emptyItem.className = 'context-menu-item disabled';
+      emptyItem.textContent = 'Sem outros workspaces';
+      ctxWorkspaceSubmenu.appendChild(emptyItem);
+    } else {
+      for (const ws of otherWorkspaces) {
+        const item = document.createElement('div');
+        item.className = 'context-menu-item';
+        item.innerHTML = `<span class="ws-item-icon">${getIconSymbol(ws.icon)}</span> <span>${escapeHtml(ws.name)}</span>`;
+        item.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          closeTabContextMenu();
+          if (api.workspaces) {
+            await api.workspaces.moveTab(tabId, ws.id, false);
+          }
+        });
+        ctxWorkspaceSubmenu.appendChild(item);
+      }
+    }
+
+    const divider = document.createElement('div');
+    divider.className = 'menu-divider';
+    ctxWorkspaceSubmenu.appendChild(divider);
+
+    const newItem = document.createElement('div');
+    newItem.className = 'context-menu-item';
+    newItem.innerHTML = `<span>+ Mover para novo Workspace...</span>`;
+    newItem.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeTabContextMenu();
+      openCreateWorkspaceModal({ moveTabId: tabId });
+    });
+    ctxWorkspaceSubmenu.appendChild(newItem);
+  };
+
+  const closeAllPopups = () => {
+    menuDropdown?.classList.remove('show');
+    shieldPopover?.classList.remove('show');
+    extensionsPopover?.classList.remove('show');
+    closeTabContextMenu();
+    closeWorkspaceContextMenu();
+    if (workspacePopover) {
+      workspacePopover.style.display = 'none';
+      btnWorkspaceSelect?.classList.remove('open');
+    }
+  };
+
+  // --- Workspaces UI Controller Methods ---
+  const updateWorkspacePill = (ws = currentActiveWorkspace) => {
+    if (ws) currentActiveWorkspace = ws;
+    if (!currentActiveWorkspace) return;
+    if (workspaceActiveName) workspaceActiveName.textContent = currentActiveWorkspace.name;
+    if (workspaceActiveIcon) workspaceActiveIcon.textContent = getIconSymbol(currentActiveWorkspace.icon);
+    if (workspaceActiveDot) {
+      const hex = getColorHex(currentActiveWorkspace.color);
+      workspaceActiveDot.style.backgroundColor = hex;
+      workspaceActiveDot.style.boxShadow = `0 0 6px ${hex}`;
+    }
+  };
+
+  const renderWorkspacePopover = () => {
+    if (!workspaceItemsList) return;
+    workspaceItemsList.innerHTML = '';
+
+    currentWorkspaces.forEach((ws) => {
+      const row = document.createElement('div');
+      row.className = `ws-row ${ws.isActive ? 'active' : ''}`;
+      row.dataset.id = ws.id;
+
+      const left = document.createElement('div');
+      left.className = 'ws-row-left';
+      left.innerHTML = `
+        <span class="ws-color-dot" style="background-color: ${getColorHex(ws.color)}; box-shadow: 0 0 6px ${getColorHex(ws.color)};"></span>
+        <span class="ws-icon-symbol">${getIconSymbol(ws.icon)}</span>
+        <div class="ws-meta">
+          <span class="ws-name">${escapeHtml(ws.name)}</span>
+          <span class="ws-tabs-count">${ws.tabCount} ${ws.tabCount === 1 ? 'aba' : 'abas'}</span>
+        </div>
+      `;
+
+      left.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        closeAllPopups();
+        if (!ws.isActive && api.workspaces) {
+          await api.workspaces.switch(ws.id);
+        }
+      });
+
+      const actions = document.createElement('div');
+      actions.className = 'ws-row-actions';
+      actions.innerHTML = `
+        <button class="ws-action-btn" title="Opções do workspace">
+          <svg viewBox="0 0 16 16"><circle cx="8" cy="3.5" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="12.5" r="1.3" fill="currentColor"/></svg>
+        </button>
+      `;
+
+      actions.querySelector('.ws-action-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openWorkspaceContextMenu(e.clientX, e.clientY, ws.id);
+      });
+
+      row.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openWorkspaceContextMenu(e.clientX, e.clientY, ws.id);
+      });
+
+      row.appendChild(left);
+      row.appendChild(actions);
+      workspaceItemsList.appendChild(row);
+    });
+  };
+
+  const openWorkspaceContextMenu = (x, y, wsId) => {
+    closeAllPopups();
+    contextMenuWsId = wsId;
+    if (!workspaceContextMenu) return;
+    if (ctxWsDelete) {
+      if (currentWorkspaces.length <= 1) {
+        ctxWsDelete.classList.add('disabled');
+        ctxWsDelete.style.opacity = '0.5';
+        ctxWsDelete.style.pointerEvents = 'none';
+      } else {
+        ctxWsDelete.classList.remove('disabled');
+        ctxWsDelete.style.opacity = '1';
+        ctxWsDelete.style.pointerEvents = 'auto';
+      }
+    }
+    workspaceContextMenu.style.left = `${Math.min(x, window.innerWidth - 180)}px`;
+    workspaceContextMenu.style.top = `${y}px`;
+    workspaceContextMenu.style.display = 'block';
+    workspaceContextMenu.classList.add('show');
+  };
+
+  const closeWorkspaceContextMenu = () => {
+    if (workspaceContextMenu) {
+      workspaceContextMenu.style.display = 'none';
+      workspaceContextMenu.classList.remove('show');
+    }
+    contextMenuWsId = null;
+  };
+
+  const renderColorPicker = () => {
+    if (!wsColorPicker) return;
+    wsColorPicker.innerHTML = '';
+    WORKSPACE_COLORS.forEach((col) => {
+      const swatch = document.createElement('div');
+      swatch.className = `ws-color-swatch ${col.id === selectedModalColor ? 'selected' : ''}`;
+      swatch.style.backgroundColor = col.hex;
+      swatch.title = col.id;
+      swatch.addEventListener('click', () => {
+        selectedModalColor = col.id;
+        renderColorPicker();
+      });
+      wsColorPicker.appendChild(swatch);
+    });
+  };
+
+  const renderIconPicker = () => {
+    if (!wsIconPicker) return;
+    wsIconPicker.innerHTML = '';
+    WORKSPACE_ICONS.forEach((ico) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `ws-icon-btn ${ico.id === selectedModalIcon ? 'selected' : ''}`;
+      btn.textContent = ico.symbol;
+      btn.title = ico.label;
+      btn.addEventListener('click', () => {
+        selectedModalIcon = ico.id;
+        renderIconPicker();
+      });
+      wsIconPicker.appendChild(btn);
+    });
+  };
+
+  const openCreateWorkspaceModal = (options = {}) => {
+    closeAllPopups();
+    editingWorkspaceId = null;
+    moveTabOnCreate = options.moveTabId || null;
+    selectedModalColor = 'cyan';
+    selectedModalIcon = 'briefcase';
+    if (workspaceModalTitle) {
+      workspaceModalTitle.textContent = moveTabOnCreate ? 'Mover para Novo Workspace' : 'Novo Workspace';
+    }
+    if (wsInputName) {
+      wsInputName.value = '';
+    }
+    renderColorPicker();
+    renderIconPicker();
+    if (workspaceEditModal) {
+      workspaceEditModal.style.display = 'flex';
+      setTimeout(() => wsInputName?.focus(), 50);
+    }
+  };
+
+  const openEditWorkspaceModal = (wsId) => {
+    closeAllPopups();
+    const ws = currentWorkspaces.find((w) => w.id === wsId);
+    if (!ws) return;
+    editingWorkspaceId = wsId;
+    moveTabOnCreate = null;
+    selectedModalColor = ws.color || 'cyan';
+    selectedModalIcon = ws.icon || 'briefcase';
+    if (workspaceModalTitle) {
+      workspaceModalTitle.textContent = 'Editar Workspace';
+    }
+    if (wsInputName) {
+      wsInputName.value = ws.name;
+    }
+    renderColorPicker();
+    renderIconPicker();
+    if (workspaceEditModal) {
+      workspaceEditModal.style.display = 'flex';
+      setTimeout(() => wsInputName?.focus(), 50);
+    }
+  };
+
+  const closeEditModal = () => {
+    if (workspaceEditModal) {
+      workspaceEditModal.style.display = 'none';
+    }
+    editingWorkspaceId = null;
+    moveTabOnCreate = null;
+  };
+
+  const openDeleteWorkspaceModal = (wsId) => {
+    closeAllPopups();
+    if (currentWorkspaces.length <= 1) {
+      alert('Não é possível excluir o único workspace.');
+      return;
+    }
+    const ws = currentWorkspaces.find((w) => w.id === wsId);
+    if (!ws) return;
+    deletingWorkspaceId = wsId;
+    if (wsDeleteMessage) {
+      wsDeleteMessage.textContent = `O workspace "${ws.name}" possui ${ws.tabCount} ${ws.tabCount === 1 ? 'aba' : 'abas'}. O que você deseja fazer?`;
+    }
+    if (workspaceDeleteModal) {
+      workspaceDeleteModal.style.display = 'flex';
+    }
+  };
+
+  const closeDeleteModal = () => {
+    if (workspaceDeleteModal) {
+      workspaceDeleteModal.style.display = 'none';
+    }
+    deletingWorkspaceId = null;
+  };
+
+  btnWsModalSave?.addEventListener('click', async () => {
+    const rawName = wsInputName ? wsInputName.value.trim() : '';
+    const name = rawName || 'Workspace';
+
+    if (editingWorkspaceId) {
+      if (api.workspaces) {
+        await api.workspaces.rename(editingWorkspaceId, name);
+        await api.workspaces.setColor(editingWorkspaceId, selectedModalColor);
+        await api.workspaces.setIcon(editingWorkspaceId, selectedModalIcon);
+      }
+    } else {
+      if (api.workspaces) {
+        const created = await api.workspaces.create({
+          name,
+          color: selectedModalColor,
+          icon: selectedModalIcon
+        });
+        if (moveTabOnCreate && created) {
+          await api.workspaces.moveTab(moveTabOnCreate, created.id, true);
+        }
+      }
+    }
+    closeEditModal();
+  });
+
+  btnWsModalCancel?.addEventListener('click', closeEditModal);
+  btnWsModalClose?.addEventListener('click', closeEditModal);
+
+  btnWsDeleteMoveTabs?.addEventListener('click', async () => {
+    if (deletingWorkspaceId && api.workspaces) {
+      const fallback = currentWorkspaces.find((w) => w.id !== deletingWorkspaceId);
+      if (fallback) {
+        await api.workspaces.delete(deletingWorkspaceId, { targetWorkspaceId: fallback.id });
+      }
+    }
+    closeDeleteModal();
+  });
+
+  btnWsDeleteCloseTabs?.addEventListener('click', async () => {
+    if (deletingWorkspaceId && api.workspaces) {
+      await api.workspaces.delete(deletingWorkspaceId, {});
+    }
+    closeDeleteModal();
+  });
+
+  btnWsDeleteCancel?.addEventListener('click', closeDeleteModal);
+  btnWsDeleteClose?.addEventListener('click', closeDeleteModal);
+
+  ctxWsRename?.addEventListener('click', () => {
+    const id = contextMenuWsId;
+    closeWorkspaceContextMenu();
+    if (id) openEditWorkspaceModal(id);
+  });
+
+  ctxWsChangeColor?.addEventListener('click', () => {
+    const id = contextMenuWsId;
+    closeWorkspaceContextMenu();
+    if (id) openEditWorkspaceModal(id);
+  });
+
+  ctxWsChangeIcon?.addEventListener('click', () => {
+    const id = contextMenuWsId;
+    closeWorkspaceContextMenu();
+    if (id) openEditWorkspaceModal(id);
+  });
+
+  ctxWsDuplicate?.addEventListener('click', async () => {
+    const id = contextMenuWsId;
+    closeWorkspaceContextMenu();
+    if (id && api.workspaces) {
+      await api.workspaces.duplicate(id);
+    }
+  });
+
+  ctxWsMoveUp?.addEventListener('click', async () => {
+    const id = contextMenuWsId;
+    closeWorkspaceContextMenu();
+    if (id && api.workspaces) {
+      await api.workspaces.moveUp(id);
+    }
+  });
+
+  ctxWsMoveDown?.addEventListener('click', async () => {
+    const id = contextMenuWsId;
+    closeWorkspaceContextMenu();
+    if (id && api.workspaces) {
+      await api.workspaces.moveDown(id);
+    }
+  });
+
+  ctxWsDelete?.addEventListener('click', () => {
+    const id = contextMenuWsId;
+    closeWorkspaceContextMenu();
+    if (id) openDeleteWorkspaceModal(id);
+  });
+
+  const toggleWorkspacePopover = () => {
+    const isShowing = workspacePopover && workspacePopover.style.display === 'block';
+    closeAllPopups();
+    if (!isShowing && workspacePopover) {
+      renderWorkspacePopover();
+      workspacePopover.style.display = 'block';
+      btnWorkspaceSelect?.classList.add('open');
+    }
+  };
+
+  btnWorkspaceSelect?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleWorkspacePopover();
+  });
+
+  btnCreateWorkspace?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openCreateWorkspaceModal();
+  });
 
   ctxNewTab.addEventListener('click', () => {
     api.createTab();
@@ -714,6 +1171,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (extensionsPopover && !extensionsPopover.contains(e.target) && e.target !== btnExtensions && !btnExtensions?.contains(e.target)) {
       extensionsPopover.classList.remove('show');
     }
+    if (workspacePopover && !workspacePopover.contains(e.target) && !btnWorkspaceSelect?.contains(e.target)) {
+      workspacePopover.style.display = 'none';
+      btnWorkspaceSelect?.classList.remove('open');
+    }
+    if (workspaceContextMenu && !workspaceContextMenu.contains(e.target)) {
+      closeWorkspaceContextMenu();
+    }
     if (!tabContextMenu.contains(e.target)) {
       closeTabContextMenu();
     }
@@ -725,7 +1189,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isShift = e.shiftKey;
     const key = e.key.toLowerCase();
 
-    if (isCtrl && isShift && key === 'b') {
+    if (isCtrl && e.altKey && (e.key === 'ArrowRight' || e.key === 'Right')) {
+      e.preventDefault();
+      if (currentWorkspaces.length > 1 && currentActiveWorkspace && api.workspaces) {
+        const curIdx = currentWorkspaces.findIndex(w => w.id === currentActiveWorkspace.id);
+        const nextIdx = (curIdx + 1) % currentWorkspaces.length;
+        api.workspaces.switch(currentWorkspaces[nextIdx].id);
+      }
+    } else if (isCtrl && e.altKey && (e.key === 'ArrowLeft' || e.key === 'Left')) {
+      e.preventDefault();
+      if (currentWorkspaces.length > 1 && currentActiveWorkspace && api.workspaces) {
+        const curIdx = currentWorkspaces.findIndex(w => w.id === currentActiveWorkspace.id);
+        const prevIdx = (curIdx - 1 + currentWorkspaces.length) % currentWorkspaces.length;
+        api.workspaces.switch(currentWorkspaces[prevIdx].id);
+      }
+    } else if (isCtrl && e.altKey && e.key >= '1' && e.key <= '9') {
+      e.preventDefault();
+      const targetIdx = parseInt(e.key, 10) - 1;
+      if (targetIdx >= 0 && targetIdx < currentWorkspaces.length && api.workspaces) {
+        api.workspaces.switch(currentWorkspaces[targetIdx].id);
+      }
+    } else if (isCtrl && e.altKey && key === 'n') {
+      e.preventDefault();
+      openCreateWorkspaceModal();
+    } else if (isCtrl && isShift && key === 'b') {
       e.preventDefault();
       api.bookmarks.toggleBar();
     } else if (isCtrl && isShift && key === 'e') {
@@ -776,10 +1263,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       e.preventDefault();
       api.goForward();
     } else if (e.key === 'Escape') {
-      closeTabContextMenu();
-      menuDropdown.classList.remove('show');
-      if (shieldPopover) shieldPopover.classList.remove('show');
-      if (extensionsPopover) extensionsPopover.classList.remove('show');
+      closeAllPopups();
+      closeEditModal();
+      closeDeleteModal();
     }
   });
 
@@ -922,8 +1408,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Workspaces updated listener from Main Process
+  if (api.workspaces?.onUpdated) {
+    api.workspaces.onUpdated(async (workspaces) => {
+      currentWorkspaces = workspaces || [];
+      if (api.workspaces.getActive) {
+        currentActiveWorkspace = await api.workspaces.getActive();
+      }
+      updateWorkspacePill(currentActiveWorkspace);
+      if (workspacePopover && workspacePopover.style.display === 'block') {
+        renderWorkspacePopover();
+      }
+    });
+  }
+
+  // Workspaces activated listener from Main Process
+  if (api.workspaces?.onActivated) {
+    api.workspaces.onActivated(async (ws) => {
+      currentActiveWorkspace = ws;
+      updateWorkspacePill(ws);
+      if (api.workspaces.list) {
+        currentWorkspaces = await api.workspaces.list();
+      }
+      if (workspacePopover && workspacePopover.style.display === 'block') {
+        renderWorkspacePopover();
+      }
+    });
+  }
+
   // Initial tab loading & bookmarks bar state
   try {
+    if (api.workspaces) {
+      currentWorkspaces = (await api.workspaces.list()) || [];
+      currentActiveWorkspace = await api.workspaces.getActive();
+      updateWorkspacePill(currentActiveWorkspace);
+    }
+
     const initialTabs = await api.getAllTabs();
     renderTabs(initialTabs);
 

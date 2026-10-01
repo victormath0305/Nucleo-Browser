@@ -17,6 +17,7 @@ const { ExtensionManager } = require('./modules/extensions');
 const { SettingsManager } = require('./modules/settings');
 const { SearchProvider } = require('./modules/search');
 const { DefaultBrowserManager } = require('./modules/default-browser');
+const { WorkspaceManager } = require('./modules/workspaces');
 const IpcHandlerRegistry = require('./ipc/ipc-handlers');
 const path = require('path');
 
@@ -24,6 +25,7 @@ class NucleoApplication {
   constructor() {
     this.engine = new BrowserEngine();
     this.windowController = new BrowserWindowController();
+    this.workspaceManager = new WorkspaceManager();
     this.bookmarkManager = new BookmarkManager();
     this.historyManager = new HistoryManager();
     this.shieldManager = new ShieldManager();
@@ -60,8 +62,9 @@ class NucleoApplication {
     // 1. Initialize Chromium Engine, Session Policies, and Internal Protocol
     await this.engine.initialize();
 
-    // 2. Initialize Settings, Bookmarks, History, Shield and Extensions Subsystems
+    // 2. Initialize Settings, Workspaces, Bookmarks, History, Shield and Extensions Subsystems
     await this.settingsManager.initialize();
+    await this.workspaceManager.initialize();
     await this.bookmarkManager.initialize();
     await this.historyManager.initialize();
     await this.shieldManager.initialize();
@@ -77,7 +80,8 @@ class NucleoApplication {
       this.bookmarkManager,
       this.shieldManager,
       this.settingsManager,
-      this.searchProvider
+      this.searchProvider,
+      this.workspaceManager
     );
     this.windowController.setTabManager(this.tabManager);
 
@@ -101,15 +105,19 @@ class NucleoApplication {
       settingsManager: this.settingsManager,
       searchProvider: this.searchProvider,
       defaultBrowserManager: this.defaultBrowserManager,
-      browserEngine: this.engine
+      browserEngine: this.engine,
+      workspaceManager: this.workspaceManager
     });
     this.ipcRegistry.registerAll();
 
     // 8. Create Main Window
     this.windowController.createMainWindow();
 
-    // 9. Create Initial Tabs according to startup mode
+    // 9. Create Initial Tabs according to startup mode and workspaces session
     this._createStartupTabs();
+
+    // 10. Start automatic session persistence
+    this._setupSessionAutoSave();
 
     this._setupLifecycleEvents();
   }
@@ -141,13 +149,66 @@ class NucleoApplication {
     const mode = this.settingsManager.get('startup.mode');
     const specificUrls = this.settingsManager.get('startup.urls') || [];
 
-    if (mode === 'specific' && specificUrls.length > 0) {
-      specificUrls.forEach((u, i) => {
-        this.tabManager.createTab(u, i === 0);
-      });
-    } else {
-      this.tabManager.createTab(AppConfig.navigation.defaultHomepage, true);
+    const activeWs = this.workspaceManager.getActiveWorkspace();
+    const workspaces = this.workspaceManager.workspaces;
+    const storeData = this.workspaceManager.store.getData();
+    const rawWorkspaces = storeData?.workspaces || [];
+
+    let anyTabRestored = false;
+
+    for (const ws of workspaces) {
+      const rawWs = rawWorkspaces.find((r) => r.id === ws.id);
+      const savedTabs = rawWs?.tabs || [];
+      const isActiveWs = ws.id === activeWs.id;
+
+      if (isActiveWs && mode === 'specific' && specificUrls.length > 0) {
+        specificUrls.forEach((u, i) => {
+          this.tabManager.createTab(u, i === 0, ws.id);
+        });
+        anyTabRestored = true;
+      } else if (savedTabs.length > 0) {
+        savedTabs.forEach((savedTab, i) => {
+          const makeActive = isActiveWs && (savedTab.id === rawWs.activeTabId || i === 0);
+          this.tabManager.createTab(savedTab.url, makeActive, ws.id);
+        });
+        anyTabRestored = true;
+      } else if (isActiveWs) {
+        this.tabManager.createTab(AppConfig.navigation.defaultHomepage, true, ws.id);
+        anyTabRestored = true;
+      }
     }
+
+    if (!anyTabRestored) {
+      this.tabManager.createTab(AppConfig.navigation.defaultHomepage, true, activeWs.id);
+    }
+  }
+
+  _setupSessionAutoSave() {
+    let timeout = null;
+    const triggerSave = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        this._saveWorkspacesSession();
+      }, 1000);
+    };
+
+    this.tabManager.on('tab-created', triggerSave);
+    this.tabManager.on('tab-closed', triggerSave);
+    this.tabManager.on('tab-updated', triggerSave);
+    this.tabManager.on('tab-activated', triggerSave);
+  }
+
+  _saveWorkspacesSession() {
+    if (!this.workspaceManager || !this.tabManager) return;
+    for (const ws of this.workspaceManager.workspaces) {
+      const tabs = this.tabManager.getTabsForWorkspace(ws.id);
+      ws.tabIds = tabs.map((t) => t.id);
+      ws.tabs = tabs.map((t) => ({ id: t.id, url: t.url, title: t.title }));
+      if (this.tabManager.activeTabId && tabs.some((t) => t.id === this.tabManager.activeTabId)) {
+        ws.activeTabId = this.tabManager.activeTabId;
+      }
+    }
+    this.workspaceManager._persist().catch(() => {});
   }
 
   _setupLifecycleEvents() {
@@ -166,6 +227,7 @@ class NucleoApplication {
 
     // Graceful cleanup on before-quit
     app.on('before-quit', async () => {
+      this._saveWorkspacesSession();
       if (this.settingsManager && this.settingsManager.get('privacy.clearOnExit')) {
         const items = this.settingsManager.get('privacy.clearOnExitItems') || {};
         const session = this.engine.getSession();

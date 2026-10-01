@@ -1,27 +1,17 @@
 /**
  * Núcleo Browser - Workspaces Subsystem
- * Prepared for future milestone: Tab isolation, separate profiles/partitions, task workspaces
+ * Workspace management, tab context isolation, and persistence.
  * @module modules/workspaces
  */
 
-class WorkspaceManager {
-  constructor(tabManager) {
-    this.tabManager = tabManager;
-    this.workspaces = new Map();
-    this.activeWorkspaceId = 'default';
-  }
+const { WorkspaceModel, ALLOWED_COLORS, ALLOWED_ICONS } = require('./workspace-model');
+const WorkspaceStore = require('./workspace-store');
+const WorkspaceManager = require('./workspace-manager');
 
-  async initialize() {
-    // Future: Load workspaces definition
-  }
-
-  createWorkspace(name, icon) {
-    throw new Error('Workspaces scheduled for future milestone');
-  }
-
-  switchWorkspace(workspaceId) {
-    throw new Error('Workspaces scheduled for future milestone');
-  }
-}
-
-module.exports = WorkspaceManager;
+module.exports = {
+  WorkspaceModel,
+  WorkspaceStore,
+  WorkspaceManager,
+  ALLOWED_COLORS,
+  ALLOWED_ICONS
+};

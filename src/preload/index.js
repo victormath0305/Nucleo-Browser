@@ -104,6 +104,21 @@ const IPC_CHANNELS = {
   // Privacy commands
   PRIVACY_CLEAR_DATA: 'privacy:clear-data',
 
+  // Workspaces commands
+  WORKSPACES_GET_ALL: 'workspaces:get-all',
+  WORKSPACES_GET_ACTIVE: 'workspaces:get-active',
+  WORKSPACES_CREATE: 'workspaces:create',
+  WORKSPACES_RENAME: 'workspaces:rename',
+  WORKSPACES_SET_COLOR: 'workspaces:set-color',
+  WORKSPACES_SET_ICON: 'workspaces:set-icon',
+  WORKSPACES_SWITCH: 'workspaces:switch',
+  WORKSPACES_DELETE: 'workspaces:delete',
+  WORKSPACES_DUPLICATE: 'workspaces:duplicate',
+  WORKSPACES_REORDER: 'workspaces:reorder',
+  WORKSPACES_MOVE_UP: 'workspaces:move-up',
+  WORKSPACES_MOVE_DOWN: 'workspaces:move-down',
+  WORKSPACES_MOVE_TAB: 'workspaces:move-tab',
+
   // System commands
   SYSTEM_GET_ABOUT_INFO: 'system:get-about-info',
 
@@ -125,7 +140,9 @@ const IPC_CHANNELS = {
   EVENT_SETTINGS_CHANGED: 'event:settings-changed',
   EVENT_THEME_CHANGED: 'event:theme-changed',
   EVENT_SEARCH_ENGINE_CHANGED: 'event:search-engine-changed',
-  EVENT_DEFAULT_BROWSER_CHANGED: 'event:default-browser-changed'
+  EVENT_DEFAULT_BROWSER_CHANGED: 'event:default-browser-changed',
+  EVENT_WORKSPACES_UPDATED: 'event:workspaces-updated',
+  EVENT_WORKSPACE_ACTIVATED: 'event:workspace-activated'
 };
 
 // Security check: Only internal browser pages (file: or nucleo:) receive the nucleoAPI bridge.
@@ -300,6 +317,33 @@ if (isInternalPage) {
     // Privacy & Data clearing API
     privacy: {
       clearData: (options) => ipcRenderer.invoke(IPC_CHANNELS.PRIVACY_CLEAR_DATA, options)
+    },
+
+    // Workspaces API
+    workspaces: {
+      list: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACES_GET_ALL),
+      getActive: () => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACES_GET_ACTIVE),
+      create: (data) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACES_CREATE, data),
+      rename: (id, name) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACES_RENAME, { id, name }),
+      setColor: (id, color) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACES_SET_COLOR, { id, color }),
+      setIcon: (id, icon) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACES_SET_ICON, { id, icon }),
+      switch: (id) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACES_SWITCH, id),
+      delete: (id, options) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACES_DELETE, { id, ...(options || {}) }),
+      duplicate: (id) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACES_DUPLICATE, id),
+      moveTab: (tabId, targetWorkspaceId, activateInTarget = false) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACES_MOVE_TAB, { tabId, targetWorkspaceId, activateInTarget }),
+      reorder: (orderedIds) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACES_REORDER, orderedIds),
+      moveUp: (id) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACES_MOVE_UP, id),
+      moveDown: (id) => ipcRenderer.invoke(IPC_CHANNELS.WORKSPACES_MOVE_DOWN, id),
+      onUpdated: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on(IPC_CHANNELS.EVENT_WORKSPACES_UPDATED, handler);
+        return () => ipcRenderer.removeListener(IPC_CHANNELS.EVENT_WORKSPACES_UPDATED, handler);
+      },
+      onActivated: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on(IPC_CHANNELS.EVENT_WORKSPACE_ACTIVATED, handler);
+        return () => ipcRenderer.removeListener(IPC_CHANNELS.EVENT_WORKSPACE_ACTIVATED, handler);
+      }
     },
 
     // System info API
