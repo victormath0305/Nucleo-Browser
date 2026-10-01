@@ -1,6 +1,6 @@
-# Núcleo Browser (v0.7.0)
+# Núcleo Browser (v0.8.0)
 
-> Navegador desktop moderno, rápido e seguro baseado em **Chromium** e **Electron** para Windows, desenvolvido com arquitetura modular desacoplada, Workspaces e contextos de abas sem recarregamento, bloqueador nativo de anúncios, suporte a extensões Chromium (MV2/MV3) e central de configurações avançada.
+> Navegador desktop moderno, rápido e seguro baseado em **Chromium** e **Electron** para Windows, desenvolvido com arquitetura modular desacoplada, Gerenciador Nativo de Downloads com controle de ciclo de vida e velocidade/ETA, Workspaces e contextos de abas sem recarregamento, bloqueador nativo de anúncios (Núcleo Shield), suporte a extensões Chromium (MV2/MV3) e central de configurações avançada.
 
 ---
 
@@ -8,7 +8,9 @@
 
 O **Núcleo Browser** é um navegador desktop real desenvolvido para o sistema operacional Windows. Seu objetivo principal é fornecer uma experiência de navegação veloz, privada e altamente customizável, combinando o poder do motor **Chromium** com subsistemas nativos desenvolvidos do zero de forma modular.
 
-### Destaques Técnicos da Versão Atual (v0.7.0)
+### Destaques Técnicos da Versão Atual (v0.8.0)
+* **Gerenciador Nativo de Downloads (`nucleo://downloads`)**: Subsistema completo de captura de downloads Chromium com cálculo de velocidade média em tempo real (EMA), estimativa de tempo restante (ETA), pausa/retomada/cancelamento, abertura direta e revelação segura no Explorer (`shell.showItemInFolder`).
+* **Segurança de Sistema de Arquivos nos Downloads**: Sanitização estrita contra ataques de travessia de diretório (`path traversal`), caracteres proibidos no Windows (`< > : " / \ | ? *`), nomes reservados de dispositivos (`CON`, `PRN`, `AUX`, `NUL`), e resolução automática de duplicatas (`arquivo (1).ext`).
 * **Workspaces & Gestão de Contextos de Abas**: Contextos independentes de abas (ex: Pessoal, Trabalho, Estudos) dentro de uma única janela principal com alternância instantânea sem recarregamento de páginas (`WebContentsView.setVisible`).
 * **Motor Chromium 152 & Electron 44**: Compatibilidade total com as mais modernas APIs web (HTML5, CSS3, WebAssembly, WebGL, WebRTC e ES2024).
 * **Central de Configurações (`nucleo://settings`)**: Painel de controle completo com suporte a temas dinâmicos (Sistema, Escuro e Claro), 5 cores de acento, gerenciamento de Workspaces, seleção de buscador padrão, preferências de inicialização, downloads e privacidade.
@@ -17,7 +19,7 @@ O **Núcleo Browser** é um navegador desktop real desenvolvido para o sistema o
 * **Suporte Real a Extensões Chromium**: Carregamento nativo via API de Sessão do Chromium/Electron com suporte a Manifest V3 (Service Workers) e Manifest V2, isolamento local de pastas e popups nativos.
 * **Núcleo Shield (Ad & Tracker Blocker)**: Bloqueio nativo antes do envio à rede via `session.webRequest.onBeforeRequest`, com regras estilo Adblock Plus, decisão $O(1)$ com LRU Cache e whitelist de exceções.
 * **Sistema Multi-Abas com `WebContentsView`**: Cada aba é um processo renderizador independente e isolado, garantindo alta performance, estabilidade e ausência de vazamento de memória.
-* **Favoritos, Histórico & Workspaces Persistentes**: Estruturas hierárquicas e relacionais, gravação atômica serializada em disco com recuperação automática contra corrupção.
+* **Favoritos, Histórico, Workspaces & Downloads Persistentes**: Estruturas hierárquicas e relacionais, gravação atômica serializada em disco com recuperação automática contra corrupção.
 * **Segurança de Nível Bancário**: `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`, isolamento de esquemas privilegiados e sanitização defensiva contra injeções.
 
 ---
@@ -75,6 +77,7 @@ Para garantir que nenhum dado seja corrompido em caso de desligamento abrupto do
 
 ### 3. Protocolo Privilegiado `nucleo://`
 Para oferecer uma experiência de navegador de primeira classe, registramos o protocolo `nucleo://` como esquema seguro e com suporte a Fetch API. O processo principal intercepta as rotas e carrega os dashboards internos:
+* `nucleo://downloads` (e alias `nucleo://baixados`): Gerenciador Nativo de Downloads.
 * `nucleo://settings` (e alias `nucleo://configuracoes`): Central de Configurações.
 * `nucleo://newtab`: Painel de Nova Aba com atalhos de Acesso Rápido.
 * `nucleo://bookmarks` (e alias `nucleo://favoritos`): Gerenciador de Favoritos.
@@ -133,7 +136,7 @@ Para oferecer uma experiência de navegador de primeira classe, registramos o pr
 * **Histórico com Retenção Inteligente**: Registra visitas reais (com título, data, favicon e contador de acessos), expurga automaticamente registros antigos acima de 10.000 itens e exclui rigorosamente páginas internas (`nucleo://`) e sessões privadas.
 * **Limpeza Granular de Dados**: Modal para expurgar histórico, cache e cookies por períodos (Última hora, 24 horas, 7 dias ou todo o período).
 
-### 8. Workspaces & Gestão de Contextos de Abas (Novo na v0.7.0)
+### 8. Workspaces & Gestão de Contextos de Abas
 * **Contextos Independentes sem Janelas Múltiplas**: Agrupamento lógico de abas em fluxos de trabalho (ex: Pessoal, Trabalho, Estudos) dentro da janela principal única do navegador.
 * **Preservação de Estado com `WebContentsView`**: Ao trocar de workspace, as abas anteriores NÃO são destruídas e NÃO recarregam. As views inativas apenas têm sua visibilidade desativada (`view.setVisible(false)`), preservando formulários, scroll, histórico e memória intactos.
 * **Aba Ativa Memorizada**: Cada workspace lembra individualmente qual era sua aba em foco (`activeTabId`), restaurando-a instantaneamente ao retornar.
@@ -142,12 +145,22 @@ Para oferecer uma experiência de navegador de primeira classe, registramos o pr
 * **Duplicação Segura**: Clona a lista de abas e URLs sem duplicar cookies, credenciais ou tokens privados de autenticação.
 * **Exclusão Segura com Confirmação**: Permite escolher entre migrar as abas para outro workspace ou encerrá-las, impedindo a exclusão do último workspace restante.
 
+### 9. Gerenciador Nativo de Downloads (`nucleo://downloads`) (Novo na v0.8.0)
+* **Intercepção no Motor Chromium**: Conectado diretamente a `session.on('will-download')`, gerenciando instâncias de `DownloadItem` de forma nativa e assíncrona.
+* **Cálculo em Tempo Real de Velocidade & Tempo Restante**: Algoritmo de Média Móvel Exponencial (EMA) com medição de bytes transferidos por segundo e cálculo de ETA dinâmico.
+* **Controle Total de Ciclo de Vida**: Pausar, Continuar, Cancelar transferências ativas e tentar novamente falhas ou interrupções.
+* **Segurança e Sanitização no Filesystem**: Prevenção estrita de ataques de Directory Traversal (`../../`), neutralização de caracteres ilegais no Windows (`<>:"/\\|?*`), prefixação segura para nomes reservados do sistema operacional (`CON`, `PRN`, `AUX`, `NUL`), e resolução automática de duplicatas sem sobrescrita involuntária (`nome (1).ext`).
+* **Abertura Segura de Arquivos**: Métodos `shell.openPath` e `shell.showItemInFolder` com verificação prévia de existência de arquivos no disco.
+* **Histórico com Persistência Atômica**: Histórico persistido em `downloads.json` via gravação temporária e renomeação NTFS com política de auto-retenção (máx. 500 registros) e restauração automática contra corrupção.
+* **Integração com Workspaces & Barra Superior**: Associação com o Workspace de origem da aba, atalho global `Ctrl + J`, e indicador com contador no topo do navegador com animação de pulso durante downloads ativos.
+
 ---
 
 ## 4. Atalhos de Teclado
 
 | Atalho | Ação |
 | :--- | :--- |
+| `Ctrl + J` | Abrir Gerenciador de Downloads (`nucleo://downloads`) |
 | `Ctrl + Alt + ArrowRight` | Próximo Workspace |
 | `Ctrl + Alt + ArrowLeft` | Workspace Anterior |
 | `Ctrl + Alt + 1` .. `9` | Ir diretamente para o Workspace N |

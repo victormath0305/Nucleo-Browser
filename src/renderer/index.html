@@ -122,6 +122,12 @@
             <path d="M 13.5 7.5 H 12.5 V 4.5 C 12.5 3.8 11.8 3.2 11.2 3.2 H 8.5 V 2 C 8.5 1.2 7.8 0.5 7 0.5 C 6.2 0.5 5.5 1.2 5.5 2 V 3.2 H 2.8 C 2.2 3.2 1.5 3.8 1.5 4.5 V 7.2 H 2.5 C 3.2 7.2 3.8 7.8 3.8 8.5 C 3.8 9.2 3.2 9.8 2.5 9.8 H 1.5 V 12.5 C 1.5 13.2 2.2 13.8 2.8 13.8 H 5.5 V 12.8 C 5.5 12 6.2 11.5 7 11.5 C 7.8 11.5 8.5 12 8.5 12.8 V 13.8 H 11.2 C 11.8 13.8 12.5 13.2 12.5 12.5 V 9.5 H 13.5 C 14.2 9.5 14.8 8.8 14.8 8 C 14.8 7.2 14.2 7.5 13.5 7.5 Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
+        <button class="nav-btn downloads-btn" id="btnDownloads" aria-label="Downloads" title="Downloads (Ctrl+J)">
+          <svg viewBox="0 0 16 16" id="downloadsIcon">
+            <path d="M 8 2 L 8 10 M 4.5 7 L 8 10.5 L 11.5 7 M 2.5 13.5 L 13.5 13.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="downloads-badge" id="downloadsBadgeCount" style="display: none;">0</span>
+        </button>
         <button class="nav-btn" id="btnDevTools" aria-label="Ferramentas do Desenvolvedor" title="Ferramentas do Desenvolvedor (F12)">
           <svg viewBox="0 0 16 16">
             <path d="M 5 4.5 L 1.5 8 L 5 11.5 M 11 4.5 L 14.5 8 L 11 11.5 M 9.5 3 L 6.5 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -240,13 +246,14 @@
         </div>
         <span class="menu-shortcut">Ctrl+Shift+E</span>
       </div>
-      <div class="menu-item" id="menuDownloads" style="opacity: 0.65;">
+      <div class="menu-item" id="menuDownloads">
         <div class="menu-item-left">
           <svg viewBox="0 0 16 16">
             <path d="M 8 2 L 8 10 M 4 7 L 8 11 L 12 7 M 2 13 L 14 13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          <span>Downloads (em breve)</span>
+          <span>Downloads</span>
         </div>
+        <span class="menu-shortcut">Ctrl+J</span>
       </div>
       <div class="menu-divider"></div>
       <div class="menu-item" id="menuDevToolsWeb">

@@ -791,6 +791,40 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Downloads Button & Active Badge */
+.downloads-btn {
+  position: relative;
+}
+
+.downloads-btn:hover svg {
+  color: var(--accent-cyan);
+  transform: scale(1.05);
+}
+
+.downloads-badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  background: var(--accent-cyan);
+  color: #0a0d14;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 999px;
+  box-shadow: 0 0 6px rgba(0, 229, 255, 0.6);
+  pointer-events: none;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+  animation: downloadPulse 2s infinite ease-in-out;
+}
+
+@keyframes downloadPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); box-shadow: 0 0 10px rgba(0, 229, 255, 0.9); }
+  100% { transform: scale(1); }
+}
+
 /* Shield Popover Modal */
 .shield-popover {
   position: absolute;

@@ -1,6 +1,6 @@
-# Arquitetura Técnica — Núcleo Browser (v0.7.0 — Workspaces & Gestão de Contextos de Abas)
+# Arquitetura Técnica — Núcleo Browser (v0.8.0 — Download Manager Nativo)
 
-Este documento descreve a fundamentação de engenharia, a seleção de tecnologias, a arquitetura de processos, o sistema completo de abas, os subsistemas de Workspaces, favoritos, histórico, Núcleo Shield, Sistema de Extensões Chromium (MV3 & MV2), a Central de Configurações persistente, Provedores de Busca, detecção de Navegador Padrão Windows, a estratégia de persistência local atômica serializada, os padrões de segurança e a modularidade do **Núcleo Browser**.
+Este documento descreve a fundamentação de engenharia, a seleção de tecnologias, a arquitetura de processos, o sistema completo de abas, os subsistemas de Workspaces, o subsistema de Download Manager nativo, favoritos, histórico, Núcleo Shield, Sistema de Extensões Chromium (MV3 & MV2), a Central de Configurações persistente, Provedores de Busca, detecção de Navegador Padrão Windows, a estratégia de persistência local atômica serializada, os padrões de segurança e a modularidade do **Núcleo Browser**.
 
 ---
 
@@ -31,31 +31,31 @@ A tecnologia escolhida para a fundação do Núcleo Browser é o **Electron** co
 O Núcleo Browser adota rigorosamente a arquitetura multi-processos do Chromium:
 
 ```text
-┌────────────────────────────────────────────────────────────────────────┐
-│                        MAIN PROCESS (Node.js)                         │
-│                                                                        │
-│  ┌───────────────────┐  ┌──────────────────┐  ┌─────────────────────┐  │
-│  │   BrowserEngine   │  │ BrowserWindowCtrl│  │     TabManager      │  │
-│  │ (Session/Protocol)│  │ (Window Layout)  │  │ (Tabs Collection)   │  │
-│  └────────┬──────────┘  └────────┬─────────┘  └──────────┬──────────┘  │
-│           │                      │                       │             │
-│  ┌────────┴──────────┐  ┌────────┴─────────┐  ┌──────────┴──────────┐  │
-│  │   ShieldManager   │  │  BookmarkManager │  │  WorkspaceManager   │  │
-│  │(Blocking/Session) │  │  (Store/Folders) │  │ (Contexts / Switch) │  │
-│  └────────┬──────────┘  └────────┬─────────┘  └──────────┬──────────┘  │
-│           │                      │                       │             │
-│  ┌────────┴──────────┐  ┌────────┴─────────┐  ┌──────────┴──────────┐  │
-│  │   ShieldEngine    │  │  BookmarkStore   │  │   WorkspaceStore    │  │
-│  │ (Rules/LRU Cache) │  │ (bookmarks.json) │  │  (workspaces.json)  │  │
-│  └────────┬──────────┘  └──────────────────┘  └─────────────────────┘  │
-│           │                                                            │
-│  ┌────────┴──────────┐  ┌──────────────────┐  ┌─────────────────────┐  │
-│  │FilterStore & Stats│  │ NavigationCtrl   │  │   HistoryManager    │  │
-│  │   (shield.json)   │  │ (URL Resolution) │  │   (history.json)    │  │
-│  └───────────────────┘  └──────────────────┘  └─────────────────────┘  │
-│                                  │                                     │
-│                         IPC Handlers Registry                          │
-└──────────────┬───────────────────────────────┬─────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                                MAIN PROCESS (Node.js)                                  │
+│                                                                                        │
+│  ┌───────────────────┐  ┌──────────────────┐  ┌─────────────────────┐  ┌─────────────┐ │
+│  │   BrowserEngine   │  │ BrowserWindowCtrl│  │     TabManager      │  │DownloadsMgr │ │
+│  │ (Session/Protocol)│  │ (Window Layout)  │  │ (Tabs Collection)   │  │(will-downld)│ │
+│  └────────┬──────────┘  └────────┬─────────┘  └──────────┬──────────┘  └──────┬──────┘ │
+│           │                      │                       │                    │        │
+│  ┌────────┴──────────┐  ┌────────┴─────────┐  ┌──────────┴──────────┐  ┌──────┴──────┐ │
+│  │   ShieldManager   │  │  BookmarkManager │  │  WorkspaceManager   │  │DownloadsSt. │ │
+│  │(Blocking/Session) │  │  (Store/Folders) │  │ (Contexts / Switch) │  │(downloads)  │ │
+│  └────────┬──────────┘  └────────┬─────────┘  └──────────┬──────────┘  └─────────────┘ │
+│           │                      │                       │                             │
+│  ┌────────┴──────────┐  ┌────────┴─────────┐  ┌──────────┴──────────┐                  │
+│  │   ShieldEngine    │  │  BookmarkStore   │  │   WorkspaceStore    │                  │
+│  │ (Rules/LRU Cache) │  │ (bookmarks.json) │  │  (workspaces.json)  │                  │
+│  └────────┬──────────┘  └──────────────────┘  └─────────────────────┘                  │
+│           │                                                                            │
+│  ┌────────┴──────────┐  ┌──────────────────┐  ┌─────────────────────┐                  │
+│  │FilterStore & Stats│  │ NavigationCtrl   │  │   HistoryManager    │                  │
+│  │   (shield.json)   │  │ (URL Resolution) │  │   (history.json)    │                  │
+│  └───────────────────┘  └──────────────────┘  └─────────────────────┘                  │
+│                                  │                                                     │
+│                         IPC Handlers Registry                                          │
+└──────────────┬───────────────────────────────┬─────────────────────────────────────────┘
                │ (IPC Seguro via Preload)       │ (View Hierarchy)
                ▼                               ▼
 ┌───────────────────────────────┐  ┌─────────────────────────────────────┐
@@ -421,20 +421,61 @@ Localizado em `src/main/modules/workspaces/`:
 
 ---
 
-## 14. Estrutura Modular de Diretórios
+## 14. Subsistema de Download Manager Nativo (`DownloadsManager`, `DownloadsStore`, `DownloadModel` e `DownloadsUtils`)
+
+Localizado em `src/main/modules/downloads/`:
+
+### 14.1. Intercepção Nativa Chromium & Ciclo de Vida (`DownloadsManager`)
+* **Intercepção de Sessão (`session.on('will-download')`)**:
+  * O `DownloadsManager` anexa-se à `session.defaultSession` e intercepta cada evento `will-download` emitido por qualquer `WebContentsView` ou janela.
+  * Resolução de contexto de abas e Workspaces: associa o download ao `tabId` e `workspaceId` da aba originária inspecionando o WebContents emissor.
+* **Resolução Segura de Destino e Diálogo de Salvamento**:
+  * Consulta as configurações persistentes `downloads.defaultPath` e `downloads.askLocation` via `SettingsManager`.
+  * Sanitização de nome de arquivo contra Directory Traversal (`..`, `/`, `\`) e caracteres inválidos do Windows (`<>:"/\|?*`).
+  * Desduplicação inteligente com sufixos numéricos sequenciais (`arquivo (1).ext`) para evitar sobrescritas involuntárias.
+  * Invocação assíncrona do diálogo nativo de salvamento do Windows (`dialog.showSaveDialog`) quando `askLocation: true`.
+* **Métricas em Tempo Real & Controle de Ciclo de Vida**:
+  * Cálculo de velocidade por Média Móvel Exponencial (EMA com $\alpha = 0.25$) para suavizar oscilações de rede.
+  * Cálculo de tempo estimado restante (ETA) e progresso percentual (0-100%).
+  * Throttle de 150ms no envio de eventos IPC para evitar sobrecarga no canal de mensagens durante transferências de alta taxa de dados.
+  * Ações de ciclo de vida completas: pausar (`item.pause()`), retomar (`item.resume()`), cancelar (`item.cancel()`), abrir arquivo (`shell.openPath`) e revelar na pasta (`shell.showItemInFolder`).
+
+### 14.2. Persistência Atômica Serializada (`DownloadsStore`)
+* Localizado em `app.getPath('userData')/downloads.json`.
+* **Gravação Atômica via NTFS**: Grava em arquivo temporário `.tmp.<timestamp>.<rand>` e renomeia via `fs.promises.rename` para impedir corrupção de dados em desligamentos repentinos.
+* **Auto-Recuperação de Corrupção**: Em caso de JSON inválido ou corrupção no disco, o arquivo corrompido é preservado como `.corrupted.<timestamp>` e uma nova base vazia é inicializada sem falhar o boot do navegador.
+* **Retenção Máxima Automática**: Limite de 500 registros no histórico, expurgando automaticamente itens antigos concluídos/cancelados mantendo sempre os downloads ativos.
+
+### 14.3. Interface Interna `nucleo://downloads`
+* Página web dedicada com design Obsidian Dark (`src/renderer/downloads.html`), compatível com o tema visual do navegador.
+* Barra de busca rápida por nome e URL com destaque em tempo real.
+* Filtros rápidos por estado: **Todos**, **Baixando**, **Concluídos** e **Cancelados / Falhos**.
+* Botões contextuais de ação por item (Pausar, Retomar, Cancelar, Abrir Arquivo, Mostrar na Pasta, Excluir do Histórico).
+* Botão global "Limpar Histórico Concluído".
+* Atualizações de progresso reativas via IPC com badge numérico em tempo real no Top Chrome (`#downloadsBadgeCount` e `#btnDownloads`) e atalho global `Ctrl+J`.
+
+---
+
+## 15. Estrutura Modular de Diretórios
 
 ```text
 src/
 ├── main/
 │   ├── config/
-│   │   └── app-config.js                # Configurações globais, versão (0.7.0) e caminhos
+│   │   └── app-config.js                # Configurações globais, versão (0.8.0) e caminhos
 │   ├── core/
 │   │   ├── browser-engine.js            # Inicialização do Chromium, sessões e protocolo nucleo://
 │   │   └── browser-window.js            # Janela frameless e cálculo de bounds dinâmicos
 │   ├── ipc/
-│   │   ├── ipc-channels.js              # Canais e eventos IPC (Settings, Search, DefaultBrowser, Workspaces, Shield, Extensões)
+│   │   ├── ipc-channels.js              # Canais e eventos IPC (Settings, Search, Workspaces, Downloads, Shield, Extensões)
 │   │   └── ipc-handlers.js              # Registro e delegação de comandos IPC seguros
 │   ├── modules/
+│   │   ├── downloads/                   # Subsistema Nativo de Gerenciamento de Downloads
+│   │   │   ├── downloads-utils.js       # Sanitização de caminhos, cálculo de EMA, ETA e formatos
+│   │   │   ├── downloads-model.js       # Modelo formal de ciclo de vida e estados de download
+│   │   │   ├── downloads-store.js       # Persistência atômica serializada (downloads.json)
+│   │   │   ├── downloads-manager.js     # Interceptador Chromium, orquestrador e controle de DownloadItem
+│   │   │   └── index.js                 # Fachada do módulo Downloads
 │   │   ├── workspaces/                  # Subsistema de Workspaces & Contextos de Abas
 │   │   │   ├── workspace-model.js       # Modelo, validação de nomes, cores e ícones
 │   │   │   ├── workspace-store.js       # Persistência atômica serializada (workspaces.json)
@@ -485,11 +526,12 @@ src/
 │   │       └── tab-manager.js
 │   └── app.js                           # Orquestração do ciclo de vida e instanciação
 ├── preload/
-│   └── index.js                         # ContextBridge seguro (nucleoAPI.settings, search, defaultBrowser, etc.)
+│   └── index.js                         # ContextBridge seguro (nucleoAPI.downloads, settings, search, etc.)
 └── renderer/
     ├── bookmarks.html                   # Interface do Gerenciador de Favoritos
     ├── history.html                     # Interface do Histórico de Navegação
-    ├── index.html                       # Top chrome do navegador (abas, omnibox, shield, extensões)
+    ├── downloads.html                   # Interface Nativa do Gerenciador de Downloads
+    ├── index.html                       # Top chrome do navegador (abas, omnibox, downloads, shield, extensões)
     ├── newtab.html                      # Página de Nova Aba com Acesso Rápido
     ├── shield.html                      # Dashboard de controle e estatísticas do Núcleo Shield
     ├── shield-test.html                 # Fixture de validação e testes determinísticos offline do Shield
@@ -498,7 +540,7 @@ src/
     ├── settings.html                    # Central de Configurações Obsidian do Núcleo Browser
     ├── scripts/
     │   ├── address-bar.js               # Lógica de digitação e formatação de URLs
-    │   └── ui-controller.js             # Controle da UI, popovers de Shield e Extensões, temas e abas
+    │   └── ui-controller.js             # Controle da UI, popovers, downloads badge, temas e abas
     └── styles/
         ├── main.css                     # Estilos principais, badges e popovers
         └── theme.css                    # Variáveis e design tokens (Dark/Light + 5 cores de acento)

@@ -16,9 +16,10 @@ const { SettingsValidator, SettingsStore, SettingsManager, getDefaultSettings } 
 const { SearchProvider, BUILTIN_SEARCH_ENGINES } = require('../src/main/modules/search');
 const { DefaultBrowserManager } = require('../src/main/modules/default-browser');
 const { WorkspaceModel, WorkspaceStore, WorkspaceManager } = require('../src/main/modules/workspaces');
+const { DownloadsUtils, DownloadModel, DownloadsStore, DownloadsManager } = require('../src/main/modules/downloads');
 
 async function runUnitTests() {
-  console.log('=== [1/2] Executing Unit Tests (v0.7.0 Workspaces, Settings, Search, Extensions, Shield, Bookmarks & History) ===\n');
+  console.log('=== [1/2] Executing Unit Tests (v0.8.0 Downloads, Workspaces, Settings, Extensions, Shield, Bookmarks & History) ===\n');
 
   // --- 1. Navigation Resolution Tests ---
   console.log('[Suite 1: Navigation Controller]');
@@ -708,6 +709,210 @@ async function runUnitTests() {
   console.assert(recoveredData.workspaces[0].name === 'Pessoal', 'Corruption recovery should provide default Pessoal workspace');
   console.log('  ✔ Atomic persistence and JSON corruption recovery verified');
 
+  // --- 9. Native Downloads Subsystem Tests ---
+  console.log('\n[Suite 9: Native Downloads Subsystem]');
+  const tempDlPath = path.join(os.tmpdir(), `nucleo-test-dl-${Date.now()}.json`);
+  const tempDlDir = path.join(os.tmpdir(), `nucleo-test-dl-dir-${Date.now()}`);
+  await fs.promises.mkdir(tempDlDir, { recursive: true });
+
+  // Test 9.1: DownloadsUtils Formatting
+  console.assert(DownloadsUtils.formatBytes(0) === '0 B', 'formatBytes(0) failed');
+  console.assert(DownloadsUtils.formatBytes(1024) === '1 KB', 'formatBytes(1024) failed');
+  console.assert(DownloadsUtils.formatBytes(1048576) === '1 MB', 'formatBytes(1048576) failed');
+  console.assert(DownloadsUtils.formatBytes(1073741824) === '1 GB', 'formatBytes(1073741824) failed');
+  console.assert(DownloadsUtils.formatBytes(-50) === '0 B', 'formatBytes(-50) failed');
+
+  console.assert(DownloadsUtils.formatSpeed(0) === '0 B/s', 'formatSpeed(0) failed');
+  console.assert(DownloadsUtils.formatSpeed(1048576).includes('MB/s'), 'formatSpeed(1048576) failed');
+
+  console.assert(DownloadsUtils.formatDuration(0) === '0s', 'formatDuration(0) failed');
+  console.assert(DownloadsUtils.formatDuration(45) === '45s', 'formatDuration(45) failed');
+  console.assert(DownloadsUtils.formatDuration(125).includes('2m'), 'formatDuration(125) failed');
+  console.assert(DownloadsUtils.formatDuration(3665).includes('1h'), 'formatDuration(3665) failed');
+  console.assert(DownloadsUtils.formatDuration(null) === '--', 'formatDuration(null) failed');
+
+  console.assert(DownloadsUtils.calculateProgress(50, 100) === 50, 'calculateProgress(50, 100) failed');
+  console.assert(DownloadsUtils.calculateProgress(0, 100) === 0, 'calculateProgress(0, 100) failed');
+  console.assert(DownloadsUtils.calculateProgress(50, 0) === -1, 'calculateProgress(50, 0) failed');
+
+  console.assert(DownloadsUtils.getFileCategory('file.zip') === 'archive', 'Category archive failed');
+  console.assert(DownloadsUtils.getFileCategory('setup.exe') === 'executable', 'Category executable failed');
+  console.assert(DownloadsUtils.getFileCategory('photo.png') === 'image', 'Category image failed');
+  console.assert(DownloadsUtils.getFileCategory('song.mp3') === 'audio', 'Category audio failed');
+  console.assert(DownloadsUtils.getFileCategory('movie.mp4') === 'video', 'Category video failed');
+  console.assert(DownloadsUtils.getFileCategory('doc.pdf') === 'document', 'Category document failed');
+  console.assert(DownloadsUtils.getFileCategory('index.js') === 'code', 'Category code failed');
+  console.log('  ✔ DownloadsUtils formatting and category classification verified');
+
+  // Test 9.2: Filename Sanitization & Directory Traversal Security
+  const traversal1 = DownloadsUtils.sanitizeFilename('../../etc/passwd');
+  console.assert(traversal1 === 'passwd', `Traversal 1 failed: expected passwd, got ${traversal1}`);
+
+  const traversal2 = DownloadsUtils.sanitizeFilename('..\\..\\Windows\\System32\\cmd.exe');
+  console.assert(traversal2 === 'cmd.exe', `Traversal 2 failed: expected cmd.exe, got ${traversal2}`);
+
+  const illegalChars = DownloadsUtils.sanitizeFilename('report<2026>:final"v1|bar?qux*.pdf');
+  console.assert(!illegalChars.includes('<') && !illegalChars.includes('>') && !illegalChars.includes(':'), 'Illegal characters not replaced');
+
+  const reservedCON = DownloadsUtils.sanitizeFilename('CON.txt');
+  console.assert(reservedCON.startsWith('_CON'), 'Windows reserved device name CON not prefixed');
+
+  const emptyDots = DownloadsUtils.sanitizeFilename('...');
+  console.assert(emptyDots === 'download', 'Empty dots filename not defaulted');
+  console.log('  ✔ Path traversal attacks & illegal filesystem characters sanitized safely');
+
+  // Test 9.3: getUniqueFilePath non-colliding name generation
+  const testFile1 = path.join(tempDlDir, 'test-doc.pdf');
+  fs.writeFileSync(testFile1, 'hello');
+  const uniquePath1 = DownloadsUtils.getUniqueFilePath(tempDlDir, 'test-doc.pdf');
+  console.assert(uniquePath1.endsWith('test-doc (1).pdf'), `Unique path 1 failed: ${uniquePath1}`);
+  fs.writeFileSync(uniquePath1, 'world');
+  const uniquePath2 = DownloadsUtils.getUniqueFilePath(tempDlDir, 'test-doc.pdf');
+  console.assert(uniquePath2.endsWith('test-doc (2).pdf'), `Unique path 2 failed: ${uniquePath2}`);
+  console.log('  ✔ Unique non-colliding duplicate file generation verified');
+
+  // Test 9.4: DownloadModel Lifecycle & Serialization
+  const dlModel = new DownloadModel({
+    filename: 'archive.zip',
+    url: 'https://example.com/archive.zip',
+    totalBytes: 1000000,
+    receivedBytes: 0,
+    workspaceId: 'workspace-pessoal'
+  });
+  console.assert(dlModel.state === 'downloading', 'Initial state should be downloading');
+  console.assert(dlModel.workspaceId === 'workspace-pessoal', 'WorkspaceId should be preserved');
+
+  dlModel.updateProgress(500000, 1000000, 250000, 2);
+  console.assert(dlModel.progress === 50, 'Progress should be 50%');
+  console.assert(dlModel.speed === 250000, 'Speed should be 250000');
+
+  dlModel.pause();
+  console.assert(dlModel.state === 'paused' && dlModel.paused === true, 'Pause state failed');
+
+  dlModel.resume();
+  console.assert(dlModel.state === 'downloading' && dlModel.paused === false, 'Resume state failed');
+
+  dlModel.complete();
+  console.assert(dlModel.state === 'completed' && dlModel.completed === true && dlModel.progress === 100, 'Complete state failed');
+  console.assert(dlModel.endTime !== null, 'EndTime should be set on complete');
+
+  const serialized = dlModel.toJSON();
+  console.assert(serialized.formattedTotal === '976.6 KB', `Formatted total unexpected: ${serialized.formattedTotal}`);
+  console.assert(serialized.state === 'completed', 'Serialized state failed');
+
+  const rehydrated = DownloadModel.fromJSON(serialized);
+  console.assert(rehydrated.filename === dlModel.filename, 'Rehydration filename failed');
+  console.log('  ✔ DownloadModel lifecycle transitions, progress calculation & JSON serialization verified');
+
+  // Test 9.5: DownloadsStore persistence, retention limit & corruption recovery
+  const dlStore = new DownloadsStore(tempDlPath, 5); // Max retention = 5
+  await dlStore.load();
+
+  // Add 10 items
+  for (let i = 1; i <= 10; i++) {
+    await dlStore.add({
+      id: `dl-test-${i}`,
+      filename: `file-${i}.txt`,
+      url: `https://example.com/file-${i}.txt`,
+      state: 'completed',
+      startTime: 1000 + i
+    });
+  }
+  // Store should have enforced max retention of 5
+  console.assert(dlStore.getAll().length === 5, `Expected 5 items after retention, got ${dlStore.getAll().length}`);
+  console.assert(dlStore.getById('dl-test-10') !== null, 'Most recent item should be kept in store');
+
+  // Test update & remove
+  await dlStore.update('dl-test-10', { state: 'failed', error: 'test error' });
+  console.assert(dlStore.getById('dl-test-10').state === 'failed', 'Store update failed');
+  await dlStore.remove('dl-test-10');
+  console.assert(dlStore.getById('dl-test-10') === null, 'Store remove failed');
+
+  // Test corruption recovery
+  fs.writeFileSync(tempDlPath, 'corrupted JSON {[{[[!@#');
+  const dlRecovered = await dlStore.load();
+  console.assert(dlRecovered && Array.isArray(dlRecovered.downloads), 'Corruption recovery failed to produce valid structure');
+  console.log('  ✔ DownloadsStore atomic persistence, retention limit & corruption recovery verified');
+
+  // Test 9.6: DownloadsManager lifecycle & event emission
+  const dlManager = new DownloadsManager({ store: dlStore });
+  await dlManager.initialize();
+
+  // Mock download item
+  const { EventEmitter: EE } = require('events');
+  class MockDownloadItem extends EE {
+    constructor() {
+      super();
+      this.filename = 'bundle.tar.gz';
+      this.url = 'https://example.com/bundle.tar.gz';
+      this.savePath = path.join(tempDlDir, 'bundle.tar.gz');
+      this.received = 0;
+      this.total = 5000000;
+      this.paused = false;
+      this.cancelled = false;
+    }
+    getFilename() { return this.filename; }
+    getURL() { return this.url; }
+    getURLChain() { return [this.url]; }
+    getMimeType() { return 'application/gzip'; }
+    getSavePath() { return this.savePath; }
+    setSavePath(p) { this.savePath = p; }
+    setSaveDialogOptions() {}
+    getTotalBytes() { return this.total; }
+    getReceivedBytes() { return this.received; }
+    isPaused() { return this.paused; }
+    canResume() { return true; }
+    pause() { this.paused = true; }
+    resume() { this.paused = false; }
+    cancel() { this.cancelled = true; }
+  }
+
+  const mockItem = new MockDownloadItem();
+  let createdEventFired = false;
+  let updatedEventFired = false;
+  let doneEventFired = false;
+
+  dlManager.once('download-created', () => { createdEventFired = true; });
+  dlManager.once('download-updated', () => { updatedEventFired = true; });
+  dlManager.once('download-done', () => { doneEventFired = true; });
+
+  await dlManager._handleWillDownload({}, mockItem, null);
+  console.assert(createdEventFired === true, 'download-created event was not fired');
+  console.assert(dlManager.getActiveCount() === 1, 'Active download count should be 1');
+
+  const activeId = Array.from(dlManager.activeDownloads.keys())[0];
+  console.assert(activeId !== undefined, 'No active download found in manager');
+
+  // Trigger progress
+  mockItem.received = 2500000;
+  dlManager._handleItemUpdated(activeId, 'progressing');
+  // Wait a small tick for throttle
+  await new Promise(r => setTimeout(r, 200));
+  console.assert(updatedEventFired === true, 'download-updated event was not fired');
+
+  // Pause & Resume via manager
+  dlManager.pauseDownload(activeId);
+  console.assert(dlManager.getById(activeId).state === 'paused', 'Manager pause failed');
+  dlManager.resumeDownload(activeId);
+  console.assert(dlManager.getById(activeId).state === 'downloading', 'Manager resume failed');
+
+  // Done completion
+  await dlManager._handleItemDone(activeId, 'completed');
+  console.assert(doneEventFired === true, 'download-done event was not fired');
+  console.assert(dlManager.getActiveCount() === 0, 'Active downloads should be 0 after completion');
+  console.assert(dlManager.getById(activeId).state === 'completed', 'Final state should be completed');
+
+  // Clear history
+  await dlManager.clearHistory();
+  console.assert(dlManager.getAll().length === 0, 'clearHistory should remove completed downloads');
+  console.log('  ✔ DownloadsManager mock download lifecycle, progress throttling & state control verified');
+
+  // Test 9.7: NavigationController nucleo://downloads resolution
+  const navDownloads = new NavigationController(null);
+  console.assert(navDownloads.resolveInputToUrl('nucleo://downloads') === 'nucleo://downloads', 'nucleo://downloads resolution failed');
+  console.assert(navDownloads.resolveInputToUrl('nucleo://baixados') === 'nucleo://downloads', 'nucleo://baixados resolution failed');
+  console.log('  ✔ NavigationController nucleo://downloads & nucleo://baixados resolution verified');
+
   // Cleanup temp files
   try {
     if (fs.existsSync(tempBmPath)) fs.unlinkSync(tempBmPath);
@@ -716,6 +921,8 @@ async function runUnitTests() {
     if (fs.existsSync(tempExtStorePath)) fs.unlinkSync(tempExtStorePath);
     if (fs.existsSync(tempSettingsPath)) fs.unlinkSync(tempSettingsPath);
     if (fs.existsSync(tempWsPath)) fs.unlinkSync(tempWsPath);
+    if (fs.existsSync(tempDlPath)) fs.unlinkSync(tempDlPath);
+    if (fs.existsSync(tempDlDir)) await fs.promises.rm(tempDlDir, { recursive: true, force: true });
     if (fs.existsSync(tempExtDir)) await fs.promises.rm(tempExtDir, { recursive: true, force: true });
   } catch {}
 
@@ -758,7 +965,7 @@ async function main() {
     }
     await runIntegrationTest();
     console.log('\n=============================================');
-    console.log('  ALL NÚCLEO BROWSER v0.7.0 TESTS PASSED (100%)');
+    console.log('  ALL NÚCLEO BROWSER v0.8.0 TESTS PASSED (100%)');
     console.log('=============================================\n');
     process.exit(0);
   } catch (err) {

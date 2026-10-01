@@ -119,6 +119,18 @@ const IPC_CHANNELS = {
   WORKSPACES_MOVE_DOWN: 'workspaces:move-down',
   WORKSPACES_MOVE_TAB: 'workspaces:move-tab',
 
+  // Downloads commands
+  DOWNLOADS_LIST: 'downloads:list',
+  DOWNLOADS_GET: 'downloads:get',
+  DOWNLOADS_PAUSE: 'downloads:pause',
+  DOWNLOADS_RESUME: 'downloads:resume',
+  DOWNLOADS_CANCEL: 'downloads:cancel',
+  DOWNLOADS_OPEN_FILE: 'downloads:open-file',
+  DOWNLOADS_SHOW_IN_FOLDER: 'downloads:show-in-folder',
+  DOWNLOADS_REMOVE: 'downloads:remove',
+  DOWNLOADS_CLEAR: 'downloads:clear',
+  DOWNLOADS_GET_ACTIVE_COUNT: 'downloads:get-active-count',
+
   // System commands
   SYSTEM_GET_ABOUT_INFO: 'system:get-about-info',
 
@@ -142,7 +154,11 @@ const IPC_CHANNELS = {
   EVENT_SEARCH_ENGINE_CHANGED: 'event:search-engine-changed',
   EVENT_DEFAULT_BROWSER_CHANGED: 'event:default-browser-changed',
   EVENT_WORKSPACES_UPDATED: 'event:workspaces-updated',
-  EVENT_WORKSPACE_ACTIVATED: 'event:workspace-activated'
+  EVENT_WORKSPACE_ACTIVATED: 'event:workspace-activated',
+  EVENT_DOWNLOADS_CREATED: 'event:downloads-created',
+  EVENT_DOWNLOADS_UPDATED: 'event:downloads-updated',
+  EVENT_DOWNLOADS_DONE: 'event:downloads-done',
+  EVENT_DOWNLOADS_CLEARED: 'event:downloads-cleared'
 };
 
 // Security check: Only internal browser pages (file: or nucleo:) receive the nucleoAPI bridge.
@@ -343,6 +359,40 @@ if (isInternalPage) {
         const handler = (event, data) => callback(data);
         ipcRenderer.on(IPC_CHANNELS.EVENT_WORKSPACE_ACTIVATED, handler);
         return () => ipcRenderer.removeListener(IPC_CHANNELS.EVENT_WORKSPACE_ACTIVATED, handler);
+      }
+    },
+
+    // Downloads API
+    downloads: {
+      list: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_LIST),
+      get: (id) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_GET, id),
+      pause: (id) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_PAUSE, id),
+      resume: (id) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_RESUME, id),
+      cancel: (id) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_CANCEL, id),
+      openFile: (id) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_OPEN_FILE, id),
+      showInFolder: (id) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_SHOW_IN_FOLDER, id),
+      remove: (id) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_REMOVE, id),
+      clear: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_CLEAR),
+      getActiveCount: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_GET_ACTIVE_COUNT),
+      onCreated: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on(IPC_CHANNELS.EVENT_DOWNLOADS_CREATED, handler);
+        return () => ipcRenderer.removeListener(IPC_CHANNELS.EVENT_DOWNLOADS_CREATED, handler);
+      },
+      onUpdated: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on(IPC_CHANNELS.EVENT_DOWNLOADS_UPDATED, handler);
+        return () => ipcRenderer.removeListener(IPC_CHANNELS.EVENT_DOWNLOADS_UPDATED, handler);
+      },
+      onDone: (callback) => {
+        const handler = (event, data) => callback(data);
+        ipcRenderer.on(IPC_CHANNELS.EVENT_DOWNLOADS_DONE, handler);
+        return () => ipcRenderer.removeListener(IPC_CHANNELS.EVENT_DOWNLOADS_DONE, handler);
+      },
+      onCleared: (callback) => {
+        const handler = () => callback();
+        ipcRenderer.on(IPC_CHANNELS.EVENT_DOWNLOADS_CLEARED, handler);
+        return () => ipcRenderer.removeListener(IPC_CHANNELS.EVENT_DOWNLOADS_CLEARED, handler);
       }
     },
 

@@ -52,6 +52,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnPopoverInstallExt = document.getElementById('btnPopoverInstallExt');
   const btnPopoverOpenManagement = document.getElementById('btnPopoverOpenManagement');
 
+  // DOM Elements - Downloads
+  const btnDownloads = document.getElementById('btnDownloads');
+  const downloadsBadgeCount = document.getElementById('downloadsBadgeCount');
+
   // DOM Elements - Bookmarks Bar
   const bookmarksBar = document.getElementById('bookmarksBar');
   const bookmarksItems = document.getElementById('bookmarksItems');
@@ -539,6 +543,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     menuExtensions.addEventListener('click', () => {
       menuDropdown.classList.remove('show');
       api.createTab('nucleo://extensions');
+    });
+  }
+
+  if (btnDownloads) {
+    btnDownloads.addEventListener('click', () => {
+      api.createTab('nucleo://downloads');
     });
   }
 
@@ -1138,6 +1148,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  if (menuDownloads) {
+    menuDownloads.addEventListener('click', () => {
+      api.createTab('nucleo://downloads');
+      menuDropdown.classList.remove('show');
+    });
+  }
+
   menuDevToolsWeb.addEventListener('click', () => {
     api.toggleWebDevTools();
     menuDropdown.classList.remove('show');
@@ -1224,6 +1241,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else if (isCtrl && (key === 'h')) {
       e.preventDefault();
       api.createTab('nucleo://history');
+    } else if (isCtrl && (key === 'j')) {
+      e.preventDefault();
+      api.createTab('nucleo://downloads');
     } else if (isCtrl && isShift && (key === 'o')) {
       e.preventDefault();
       api.createTab('nucleo://bookmarks');
@@ -1456,6 +1476,30 @@ document.addEventListener('DOMContentLoaded', async () => {
       const theme = await api.settings.get('appearance.theme');
       const accent = await api.settings.get('appearance.accentColor');
       applyTheme(theme, accent);
+    }
+
+    // Downloads badge sync & event listeners
+    const updateDownloadsBadge = async () => {
+      if (!api.downloads || !downloadsBadgeCount) return;
+      try {
+        const count = await api.downloads.getActiveCount();
+        if (count > 0) {
+          downloadsBadgeCount.textContent = count > 99 ? '99+' : count;
+          downloadsBadgeCount.style.display = 'inline-block';
+        } else {
+          downloadsBadgeCount.style.display = 'none';
+        }
+      } catch (err) {
+        console.warn('[Núcleo UI] Downloads badge sync error:', err);
+      }
+    };
+
+    if (api.downloads) {
+      api.downloads.onCreated(() => updateDownloadsBadge());
+      api.downloads.onUpdated(() => updateDownloadsBadge());
+      api.downloads.onDone(() => updateDownloadsBadge());
+      api.downloads.onCleared(() => updateDownloadsBadge());
+      await updateDownloadsBadge();
     }
 
     await syncShieldForActiveTab();

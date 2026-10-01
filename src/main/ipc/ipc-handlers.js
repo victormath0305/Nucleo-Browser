@@ -22,7 +22,8 @@ class IpcHandlerRegistry {
     searchProvider = null,
     defaultBrowserManager = null,
     browserEngine = null,
-    workspaceManager = null
+    workspaceManager = null,
+    downloadsManager = null
   }) {
     this.windowController = windowController;
     this.tabManager = tabManager;
@@ -37,6 +38,7 @@ class IpcHandlerRegistry {
     this.defaultBrowserManager = defaultBrowserManager;
     this.browserEngine = browserEngine;
     this.workspaceManager = workspaceManager;
+    this.downloadsManager = downloadsManager;
   }
 
   registerAll() {
@@ -54,6 +56,7 @@ class IpcHandlerRegistry {
     this._registerPrivacyHandlers();
     this._registerSystemHandlers();
     this._registerWorkspaceHandlers();
+    this._registerDownloadHandlers();
     this._forwardTabEventsToRenderer();
     this._forwardDataEventsToRenderer();
   }
@@ -610,6 +613,24 @@ class IpcHandlerRegistry {
         broadcastEvent(IPC_CHANNELS.EVENT_WORKSPACE_ACTIVATED, workspace);
       });
     }
+
+    if (this.downloadsManager) {
+      this.downloadsManager.on('download-created', (download) => {
+        broadcastEvent(IPC_CHANNELS.EVENT_DOWNLOADS_CREATED, download);
+      });
+
+      this.downloadsManager.on('download-updated', (download) => {
+        broadcastEvent(IPC_CHANNELS.EVENT_DOWNLOADS_UPDATED, download);
+      });
+
+      this.downloadsManager.on('download-done', (download) => {
+        broadcastEvent(IPC_CHANNELS.EVENT_DOWNLOADS_DONE, download);
+      });
+
+      this.downloadsManager.on('downloads-cleared', () => {
+        broadcastEvent(IPC_CHANNELS.EVENT_DOWNLOADS_CLEARED);
+      });
+    }
   }
 
   _validateInternalSender(event) {
@@ -619,7 +640,7 @@ class IpcHandlerRegistry {
     if (url.startsWith('nucleo://') || url.startsWith('file://')) {
       return true;
     }
-    throw new Error('Acesso negado: páginas web externas não podem acessar as APIs de Workspaces.');
+    throw new Error('Acesso negado: páginas web externas não podem acessar as APIs internas do navegador.');
   }
 
   _registerWorkspaceHandlers() {
@@ -714,6 +735,61 @@ class IpcHandlerRegistry {
         this.tabManager.moveTabToWorkspace(tabId, targetWorkspaceId, activateInTarget);
       }
       return { success: true };
+    });
+  }
+
+  _registerDownloadHandlers() {
+    if (!this.downloadsManager) return;
+
+    ipcMain.handle(IPC_CHANNELS.DOWNLOADS_LIST, (event) => {
+      this._validateInternalSender(event);
+      return this.downloadsManager.getAll();
+    });
+
+    ipcMain.handle(IPC_CHANNELS.DOWNLOADS_GET, (event, id) => {
+      this._validateInternalSender(event);
+      return this.downloadsManager.getById(id);
+    });
+
+    ipcMain.handle(IPC_CHANNELS.DOWNLOADS_PAUSE, (event, id) => {
+      this._validateInternalSender(event);
+      return this.downloadsManager.pauseDownload(id);
+    });
+
+    ipcMain.handle(IPC_CHANNELS.DOWNLOADS_RESUME, (event, id) => {
+      this._validateInternalSender(event);
+      return this.downloadsManager.resumeDownload(id);
+    });
+
+    ipcMain.handle(IPC_CHANNELS.DOWNLOADS_CANCEL, (event, id) => {
+      this._validateInternalSender(event);
+      return this.downloadsManager.cancelDownload(id);
+    });
+
+    ipcMain.handle(IPC_CHANNELS.DOWNLOADS_OPEN_FILE, async (event, id) => {
+      this._validateInternalSender(event);
+      return await this.downloadsManager.openFile(id);
+    });
+
+    ipcMain.handle(IPC_CHANNELS.DOWNLOADS_SHOW_IN_FOLDER, (event, id) => {
+      this._validateInternalSender(event);
+      return this.downloadsManager.showInFolder(id);
+    });
+
+    ipcMain.handle(IPC_CHANNELS.DOWNLOADS_REMOVE, async (event, id) => {
+      this._validateInternalSender(event);
+      return await this.downloadsManager.removeDownload(id);
+    });
+
+    ipcMain.handle(IPC_CHANNELS.DOWNLOADS_CLEAR, async (event) => {
+      this._validateInternalSender(event);
+      await this.downloadsManager.clearHistory();
+      return { success: true };
+    });
+
+    ipcMain.handle(IPC_CHANNELS.DOWNLOADS_GET_ACTIVE_COUNT, (event) => {
+      this._validateInternalSender(event);
+      return this.downloadsManager.getActiveCount();
     });
   }
 }

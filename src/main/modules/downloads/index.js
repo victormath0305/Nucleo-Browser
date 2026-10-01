@@ -1,22 +1,16 @@
 /**
- * Núcleo Browser - Downloads Subsystem
- * Prepared for future milestone: Download manager, progress tracking, virus scan hooks
+ * Núcleo Browser - Downloads Subsystem Index
  * @module modules/downloads
  */
 
-class DownloadManager {
-  constructor(browserEngine) {
-    this.engine = browserEngine;
-    this.downloads = new Map();
-  }
+const DownloadsManager = require('./downloads-manager');
+const DownloadsStore = require('./downloads-store');
+const DownloadModel = require('./downloads-model');
+const DownloadsUtils = require('./downloads-utils');
 
-  async initialize() {
-    // Future: Listen to session 'will-download' events
-  }
-
-  getActiveDownloads() {
-    return Array.from(this.downloads.values());
-  }
-}
-
-module.exports = DownloadManager;
+module.exports = {
+  DownloadsManager,
+  DownloadsStore,
+  DownloadModel,
+  DownloadsUtils
+};

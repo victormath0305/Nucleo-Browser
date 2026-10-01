@@ -74,6 +74,10 @@ class NavigationController {
       return 'nucleo://settings';
     }
 
+    if (trimmed === 'nucleo://downloads' || trimmed === 'nucleo://baixados') {
+      return 'nucleo://downloads';
+    }
+
     // Explicit nucleo:// protocol
     if (/^nucleo:\/\//i.test(trimmed)) {
       return trimmed;

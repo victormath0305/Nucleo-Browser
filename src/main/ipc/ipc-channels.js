@@ -120,6 +120,18 @@ const IPC_CHANNELS = {
   WORKSPACES_MOVE_DOWN: 'workspaces:move-down',
   WORKSPACES_MOVE_TAB: 'workspaces:move-tab',
 
+  // Downloads commands
+  DOWNLOADS_LIST: 'downloads:list',
+  DOWNLOADS_GET: 'downloads:get',
+  DOWNLOADS_PAUSE: 'downloads:pause',
+  DOWNLOADS_RESUME: 'downloads:resume',
+  DOWNLOADS_CANCEL: 'downloads:cancel',
+  DOWNLOADS_OPEN_FILE: 'downloads:open-file',
+  DOWNLOADS_SHOW_IN_FOLDER: 'downloads:show-in-folder',
+  DOWNLOADS_REMOVE: 'downloads:remove',
+  DOWNLOADS_CLEAR: 'downloads:clear',
+  DOWNLOADS_GET_ACTIVE_COUNT: 'downloads:get-active-count',
+
   // System & About info
   SYSTEM_GET_ABOUT_INFO: 'system:get-about-info',
 
@@ -143,7 +155,11 @@ const IPC_CHANNELS = {
   EVENT_SEARCH_ENGINE_CHANGED: 'event:search-engine-changed',
   EVENT_DEFAULT_BROWSER_CHANGED: 'event:default-browser-changed',
   EVENT_WORKSPACES_UPDATED: 'event:workspaces-updated',
-  EVENT_WORKSPACE_ACTIVATED: 'event:workspace-activated'
+  EVENT_WORKSPACE_ACTIVATED: 'event:workspace-activated',
+  EVENT_DOWNLOADS_CREATED: 'event:downloads-created',
+  EVENT_DOWNLOADS_UPDATED: 'event:downloads-updated',
+  EVENT_DOWNLOADS_DONE: 'event:downloads-done',
+  EVENT_DOWNLOADS_CLEARED: 'event:downloads-cleared'
 };
 
 module.exports = IPC_CHANNELS;

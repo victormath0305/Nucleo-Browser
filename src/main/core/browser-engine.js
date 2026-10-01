@@ -94,6 +94,8 @@ class BrowserEngine {
             targetPath = AppConfig.paths.extensionTestHtml;
           } else if (host === 'settings' || host === 'configuracoes') {
             targetPath = AppConfig.paths.settingsHtml;
+          } else if (host === 'downloads' || host === 'baixados') {
+            targetPath = AppConfig.paths.downloadsHtml;
           } else if (host === 'newtab') {
             targetPath = AppConfig.paths.newTabHtml;
           } else {

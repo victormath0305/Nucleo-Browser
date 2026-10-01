@@ -7,7 +7,7 @@ const path = require('path');
 
 const AppConfig = {
   appName: 'Núcleo Browser',
-  appVersion: '0.7.0',
+  appVersion: '0.8.0',
   appId: 'com.nucleobrowser.app',
 
   window: {
@@ -70,7 +70,8 @@ const AppConfig = {
     shieldTestHtml: path.join(__dirname, '..', '..', 'renderer', 'shield-test.html'),
     extensionsHtml: path.join(__dirname, '..', '..', 'renderer', 'extensions.html'),
     extensionTestHtml: path.join(__dirname, '..', '..', 'renderer', 'extension-test.html'),
-    settingsHtml: path.join(__dirname, '..', '..', 'renderer', 'settings.html')
+    settingsHtml: path.join(__dirname, '..', '..', 'renderer', 'settings.html'),
+    downloadsHtml: path.join(__dirname, '..', '..', 'renderer', 'downloads.html')
   }
 };
 

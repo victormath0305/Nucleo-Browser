@@ -21,6 +21,7 @@ const { SettingsManager, SettingsStore } = require('../src/main/modules/settings
 const { SearchProvider } = require('../src/main/modules/search');
 const { DefaultBrowserManager } = require('../src/main/modules/default-browser');
 const { WorkspaceManager, WorkspaceStore } = require('../src/main/modules/workspaces');
+const { DownloadsManager, DownloadsStore } = require('../src/main/modules/downloads');
 const IpcHandlerRegistry = require('../src/main/ipc/ipc-handlers');
 
 const tempBmPath = path.join(os.tmpdir(), `nucleo-int-bm-${Date.now()}.json`);
@@ -29,10 +30,11 @@ const tempShieldPath = path.join(os.tmpdir(), `nucleo-int-shield-${Date.now()}.j
 const tempExtPath = path.join(os.tmpdir(), `nucleo-int-ext-${Date.now()}.json`);
 const tempSettingsPath = path.join(os.tmpdir(), `nucleo-int-settings-${Date.now()}.json`);
 const tempWsPath = path.join(os.tmpdir(), `nucleo-int-ws-${Date.now()}.json`);
+const tempDlPath = path.join(os.tmpdir(), `nucleo-int-dl-${Date.now()}.json`);
 const tempExtDir = path.join(os.tmpdir(), `nucleo-int-ext-dir-${Date.now()}`);
 
 app.whenReady().then(async () => {
-  console.log('--- Initializing Integration Test Environment (v0.7.0 Workspaces, Settings, Extensions & Shield) ---');
+  console.log('--- Initializing Integration Test Environment (v0.8.0 Downloads, Workspaces, Settings, Extensions & Shield) ---');
   await fs.promises.mkdir(tempExtDir, { recursive: true });
 
   const engine = new BrowserEngine();
@@ -68,6 +70,13 @@ app.whenReady().then(async () => {
   const workspaceManager = new WorkspaceManager(workspaceStore);
   await workspaceManager.initialize();
 
+  const downloadsStore = new DownloadsStore(tempDlPath);
+  const downloadsManager = new DownloadsManager({
+    settingsManager,
+    store: downloadsStore
+  });
+  await downloadsManager.initialize();
+
   const windowController = new BrowserWindowController();
   const tabManager = new TabManager(
     windowController,
@@ -79,8 +88,11 @@ app.whenReady().then(async () => {
     workspaceManager
   );
   windowController.setTabManager(tabManager);
+  downloadsManager.tabManager = tabManager;
+  downloadsManager.windowController = windowController;
 
   shieldManager.attachToSession(engine.getSession(), tabManager, windowController);
+  downloadsManager.attachToSession(engine.getSession());
 
   const navigationController = new NavigationController(tabManager, searchProvider);
   const ipcRegistry = new IpcHandlerRegistry({
@@ -96,6 +108,7 @@ app.whenReady().then(async () => {
     searchProvider,
     defaultBrowserManager,
     workspaceManager,
+    downloadsManager,
     browserEngine: engine
   });
   ipcRegistry.registerAll();
@@ -482,6 +495,59 @@ app.whenReady().then(async () => {
   console.assert(workspaceManager.getWorkspace(dupWs.id) === null, 'Test 15.7 Failed: Workspace was not deleted');
   console.log('✔ Exclusão de workspace com migração segura de abas verificada');
 
+  // [Test 16] Downloads Subsystem & nucleo://downloads
+  console.log('\n[Test 16] Downloads — nucleo://downloads, Interceptação, Progresso e Histórico...');
+  const tabDl = tabManager.createTab('nucleo://downloads', true);
+  await new Promise((r) => tabDl.view.webContents.once('did-finish-load', r));
+  const dlTitle = tabDl.view.webContents.getTitle();
+  console.assert(dlTitle.includes('Downloads'), `Test 16.1 Failed: Title should include Downloads, got ${dlTitle}`);
+  console.log(`   Downloads URL: nucleo://downloads/ | Title: ${dlTitle}`);
+
+  // Test simulated download item in manager
+  const { EventEmitter: EE } = require('events');
+  class MockIntDownloadItem extends EE {
+    constructor() {
+      super();
+      this.filename = 'nucleo-setup.zip';
+      this.url = 'https://example.com/files/nucleo-setup.zip';
+      this.savePath = path.join(os.tmpdir(), 'nucleo-setup.zip');
+      this.total = 10485760;
+      this.received = 5242880;
+    }
+    getFilename() { return this.filename; }
+    getURL() { return this.url; }
+    getURLChain() { return [this.url]; }
+    getMimeType() { return 'application/zip'; }
+    getSavePath() { return this.savePath; }
+    setSavePath(p) { this.savePath = p; }
+    setSaveDialogOptions() {}
+    getTotalBytes() { return this.total; }
+    getReceivedBytes() { return this.received; }
+    isPaused() { return false; }
+    canResume() { return true; }
+    pause() {}
+    resume() {}
+    cancel() {}
+  }
+
+  const mockItem = new MockIntDownloadItem();
+  await downloadsManager._handleWillDownload({}, mockItem, tabDl.view.webContents);
+  console.assert(downloadsManager.getActiveCount() >= 1, 'Test 16.2 Failed: Active download should be tracked');
+
+  const allDl = downloadsManager.getAll();
+  console.assert(allDl.length >= 1, 'Test 16.3 Failed: Download should be in history store');
+  const ourDl = allDl.find(d => d.filename === 'nucleo-setup.zip');
+  console.assert(ourDl !== undefined, 'Test 16.4 Failed: Created download not found');
+  console.assert(ourDl.workspaceId === tabDl.workspaceId, `Test 16.5 Failed: Should record tab workspaceId ${tabDl.workspaceId}, got ${ourDl.workspaceId}`);
+  console.log(`✔ Download interceptado com contexto de Workspace: ${ourDl.filename} (${ourDl.formattedTotal}) no workspace ${ourDl.workspaceId}`);
+
+  // Finish simulated download
+  mockItem.emit('done', null, 'completed');
+  await new Promise(r => setTimeout(r, 100));
+  const completedDl = downloadsManager.getById(ourDl.id);
+  console.assert(completedDl && completedDl.state === 'completed', 'Test 16.6 Failed: Download should be completed');
+  console.log('✔ Ciclo de download concluído e persistido com sucesso no histórico');
+
   console.log('\n--- Teardown ---');
   tabManager.destroyAll();
   windowController.close();
@@ -494,6 +560,7 @@ app.whenReady().then(async () => {
     if (fs.existsSync(tempExtPath)) fs.unlinkSync(tempExtPath);
     if (fs.existsSync(tempSettingsPath)) fs.unlinkSync(tempSettingsPath);
     if (fs.existsSync(tempWsPath)) fs.unlinkSync(tempWsPath);
+    if (fs.existsSync(tempDlPath)) fs.unlinkSync(tempDlPath);
     if (fs.existsSync(tempExtDir)) fs.rmSync(tempExtDir, { recursive: true, force: true });
   } catch {}
 
