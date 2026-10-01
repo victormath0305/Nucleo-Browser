@@ -23,7 +23,7 @@ class ExtensionManager extends EventEmitter {
     this.engine = browserEngine;
     this.store = options.store || new ExtensionStore(options.storePath || null);
     this.validator = ExtensionValidator;
-    this.loader = options.loader || new ExtensionLoader(browserEngine ? browserEngine.getSession() : null);
+    this.loader = options.loader || new ExtensionLoader(null);
     this.extensionsDir = options.extensionsDir || (
       app && app.getPath
         ? path.join(app.getPath('userData'), 'extensions')

@@ -120,7 +120,13 @@ class BrowserEngine {
   }
 
   getSession() {
-    return this.session || session.defaultSession;
+    if (this.session) return this.session;
+    try {
+      if (app && typeof app.isReady === 'function' && app.isReady()) {
+        return session.defaultSession;
+      }
+    } catch {}
+    return null;
   }
 
   getSecurityManager() {
